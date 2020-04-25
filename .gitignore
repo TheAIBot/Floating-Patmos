@@ -1,2 +1,13 @@
 *.class
 *.log
+aegean/
+argo/
+compiler-rt/
+gold/
+llvm/
+local/
+misc/
+newLib/
+poseidon/
+*.bin
+patmos/simulator/build/src/libpatmos-simulator.a
