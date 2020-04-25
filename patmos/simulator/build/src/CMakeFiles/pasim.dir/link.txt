@@ -1,0 +1,1 @@
+/usr/bin/c++   -ftemplate-depth-1024 -O2 -g -DNDEBUG  -rdynamic CMakeFiles/pasim.dir/pasim.cc.o  -o pasim libpatmos-simulator.a -lboost_program_options -lelf 

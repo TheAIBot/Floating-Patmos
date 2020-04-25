@@ -1,0 +1,1 @@
+/usr/bin/c++   -ftemplate-depth-1024 -O2 -g -DNDEBUG  -rdynamic CMakeFiles/padasm.dir/padasm.cc.o  -o padasm libpatmos-simulator.a -lboost_program_options -lelf 

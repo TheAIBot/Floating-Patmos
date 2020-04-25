@@ -1,0 +1,4 @@
+/home/cake/t-crest/local/bin/pasim
+/home/cake/t-crest/local/bin/paasm
+/home/cake/t-crest/local/bin/padasm
+/home/cake/t-crest/local/bin/pacheck

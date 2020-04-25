@@ -1,0 +1,1 @@
+/usr/bin/c++   -ftemplate-depth-1024 -O2 -g -DNDEBUG  -rdynamic CMakeFiles/pacheck.dir/pacheck.cc.o  -o pacheck libpatmos-simulator.a -lboost_program_options -lelf 
