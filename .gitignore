@@ -11,3 +11,4 @@ newlib/
 poseidon/
 *.bin
 patmos/simulator/build/src/libpatmos-simulator.a
+patmos/simulator/build/Testing/
