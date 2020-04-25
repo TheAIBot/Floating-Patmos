@@ -7,7 +7,7 @@ gold/
 llvm/
 local/
 misc/
-newLib/
+newlib/
 poseidon/
 *.bin
 patmos/simulator/build/src/libpatmos-simulator.a
