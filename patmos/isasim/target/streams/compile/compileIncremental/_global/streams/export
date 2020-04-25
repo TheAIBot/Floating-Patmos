@@ -1,0 +1,1 @@
+scalac -bootclasspath /home/cake/.sbt/boot/scala-2.12.10/lib/scala-library.jar -classpath /home/cake/t-crest/patmos/isasim/target/scala-2.12/classes /home/cake/t-crest/patmos/isasim/src/main/scala/patsim/defines.scala /home/cake/t-crest/patmos/isasim/src/main/scala/patsim/PatSim.scala
