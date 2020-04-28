@@ -163,6 +163,17 @@ namespace patmos
     return result;
   }
 
+  instruction_data_t instruction_data_t::mk_LDT(const instruction_t &i,
+                                                PRR_e pred, FPR_e fd, GPR_e ra,
+                                                word_t imm)
+  {
+    instruction_data_t result(i, pred);
+    result.OPS.LDT.Fd = fd;
+    result.OPS.LDT.Ra = ra;
+    result.OPS.LDT.Imm = imm;
+    return result;
+  }
+
   instruction_data_t instruction_data_t::mk_STT(const instruction_t &i,
                                                 PRR_e pred, GPR_e ra, GPR_e rs1,
                                                 word_t imm2)
@@ -170,6 +181,17 @@ namespace patmos
     instruction_data_t result(i, pred);
     result.OPS.STT.Ra = ra;
     result.OPS.STT.Rs1 = rs1;
+    result.OPS.STT.Imm2 = imm2;
+    return result;
+  }
+
+  instruction_data_t instruction_data_t::mk_STT(const instruction_t &i,
+                                                PRR_e pred, GPR_e ra, FPR_e fs1,
+                                                word_t imm2)
+  {
+    instruction_data_t result(i, pred);
+    result.OPS.STT.Ra = ra;
+    result.OPS.STT.Fs1 = fs1;
     result.OPS.STT.Imm2 = imm2;
     return result;
   }
@@ -233,6 +255,68 @@ namespace patmos
   instruction_data_t instruction_data_t::mk_HLT(const instruction_t &i)
   {
     return instruction_data_t(i, p0);
+  }
+
+  instruction_data_t instruction_data_t::mk_FPUr(const instruction_t &i,
+                                                 PRR_e pred, FPR_e fd,
+                                                 FPR_e fs1, FPR_e fs2)
+  {
+    instruction_data_t result(i, pred);
+    result.OPS.FPUr.Fd = fd;
+    result.OPS.FPUr.Fs1 = fs1;
+    result.OPS.FPUr.Fs2 = fs2;
+    return result;
+  }
+
+  instruction_data_t instruction_data_t::mk_FPUil(const instruction_t &i,
+                                                  PRR_e pred, FPR_e fd,
+                                                  FPR_e fs1, word_t imm2)
+  {
+    instruction_data_t result(i, pred);
+    result.OPS.FPUil.Fd = fd;
+    result.OPS.FPUil.Fs1 = fs1;
+    result.OPS.FPUil.Imm2 = imm2;
+    return result;
+  }
+
+  instruction_data_t instruction_data_t::mk_FPUrs(const instruction_t &i,
+                                                 PRR_e pred, FPR_e fd,
+                                                 FPR_e fs1)
+  {
+    instruction_data_t result(i, pred);
+    result.OPS.FPUrs.Fd = fd;
+    result.OPS.FPUrs.Fs1 = fs1;
+    return result;
+  }
+
+  instruction_data_t instruction_data_t::mk_FPCt(const instruction_t &i,
+                                                 PRR_e pred, FPR_e fd,
+                                                 GPR_e rs1)
+  {
+    instruction_data_t result(i, pred);
+    result.OPS.FPCt.Fd = fd;
+    result.OPS.FPCt.Rs1 = rs1;
+    return result;
+  }
+
+  instruction_data_t instruction_data_t::mk_FPCf(const instruction_t &i,
+                                                 PRR_e pred, GPR_e rd, FPR_e fs)
+  {
+    instruction_data_t result(i, pred);
+    result.OPS.FPCf.Rd = rd;
+    result.OPS.FPCf.Fs = fs;
+    return result;
+  }
+
+  instruction_data_t instruction_data_t::mk_FPUc(const instruction_t &i,
+                                                 PRR_e pred, PRR_e pd,
+                                                 FPR_e fs1, FPR_e fs2)
+  {
+    instruction_data_t result(i, pred);
+    result.OPS.FPUc.Pd = pd;
+    result.OPS.FPUc.Fs1 = fs1;
+    result.OPS.FPUc.Fs2 = fs2;
+    return result;
   }
 }
 

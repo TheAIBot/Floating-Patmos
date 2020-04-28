@@ -212,6 +212,15 @@ namespace patmos
     rfo = r31  // Return info: Funcion offset
   };
 
+  /// Symbols representing the floating-point purpose registers.
+  enum FPR_e
+  {
+    f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15,
+    f16, f17, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27, f28, f29, f30,
+    f31,
+    NUM_FPR
+  };
+
   /// Symbols representing the predicate registers.
   enum PRR_e
   {
@@ -227,6 +236,7 @@ namespace patmos
     s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15,
     NUM_SPR,
     sp = s0,
+    sfcsr = s1,
     sl = s2,
     sh = s3,
     ss = s5,
@@ -245,6 +255,17 @@ namespace patmos
     {
       if (index == r0) return;
       assert(index < NUM_GPR);
+      Content[index] = value;
+    }
+  };
+
+  /// A register file for the general purpose registers.
+  class FPR_t : public register_file_t<FPR_e, single_t, NUM_FPR>
+  {
+  public:
+    void set(FPR_e index, single_t value)
+    {
+      assert(index < NUM_FPR);
       Content[index] = value;
     }
   };

@@ -233,6 +233,7 @@ namespace patmos
       struct
       {
         GPR_e Rd;
+        FPR_e Fd;
         GPR_e Ra;
         word_t Imm;
       } LDT;
@@ -241,6 +242,7 @@ namespace patmos
       {
         GPR_e Ra;
         GPR_e Rs1;
+        FPR_e Fs1;
         word_t Imm2;
       } STT;
       /// Operands for an STCi instruction.
@@ -278,6 +280,45 @@ namespace patmos
         GPR_e Rs1;
         GPR_e Rs2;
       } CFLrt;
+      /// Operands for an FPUr instruction.
+      struct
+      {
+        FPR_e Fd;
+        FPR_e Fs1;
+        FPR_e Fs2;
+      } FPUr;
+      /// Operands for an FPUi or FPUl instruction.
+      struct
+      {
+        FPR_e Fd;
+        FPR_e Fs1;
+        single_t Imm2;
+      } FPUil;
+      /// Operands for an FPUrs instruction.
+      struct
+      {
+        FPR_e Fd;
+        FPR_e Fs1;
+      } FPUrs;
+      /// Operands for an FPCt instruction.
+      struct
+      {
+        FPR_e Fd;
+        GPR_e Rs1;
+      } FPCt;
+      /// Operands for an FPCf instruction.
+      struct
+      {
+        GPR_e Rd;
+        FPR_e Fs;
+      } FPCf;
+      /// Operands for an FPUc instruction.
+      struct
+      {
+        PRR_e Pd;
+        FPR_e Fs1;
+        FPR_e Fs2;
+      } FPUc;
     } OPS;
 
 
@@ -482,6 +523,17 @@ namespace patmos
     static instruction_data_t mk_LDT(const instruction_t &i, PRR_e pred,
                                      GPR_e rd, GPR_e ra, word_t imm);
 
+    /// Create an LDT instruction with a register operand, an immediate operand,
+    /// and a register destination.
+    /// @param i The instruction.
+    /// @param pred The predicate register under which the instruction is
+    /// executed.
+    /// @param fd The destination register.
+    /// @param ra The first operand register.
+    /// @param imm The second operand immediate.
+    static instruction_data_t mk_LDT(const instruction_t &i, PRR_e pred,
+                                     FPR_e fd, GPR_e ra, word_t imm);
+
     /// Create an STT instruction with two register operands and an immediate
     /// operand.
     /// @param i The instruction.
@@ -492,6 +544,17 @@ namespace patmos
     /// @param imm2 The second operand immediate.
     static instruction_data_t mk_STT(const instruction_t &i, PRR_e pred,
                                      GPR_e ra, GPR_e rs1, word_t imm2);
+
+    /// Create an STT instruction with two register operands and an immediate
+    /// operand.
+    /// @param i The instruction.
+    /// @param pred The predicate register under which the instruction is
+    /// executed.
+    /// @param ra The address operand register.
+    /// @param fs1 The first operand register.
+    /// @param imm2 The second operand immediate.
+    static instruction_data_t mk_STT(const instruction_t &i, PRR_e pred,
+                                     GPR_e ra, FPR_e fs1, word_t imm2);
 
     /// Create an STC instruction with an immediate operand.
     /// @param i The instruction.
@@ -544,6 +607,69 @@ namespace patmos
     /// Create an HLT instruction without operands.
     /// @param i The instruction.
     static instruction_data_t mk_HLT(const instruction_t &i);
+
+    /// Create an FPUr instruction with two register operands and a register
+    /// destination.
+    /// @param i The instruction.
+    /// @param pred The predicate register under which the instruction is
+    /// executed.
+    /// @param fd The destination register.
+    /// @param fs1 The first operand register.
+    /// @param fs2 The second operand register.
+    static instruction_data_t mk_FPUr(const instruction_t &i, PRR_e pred,
+                                      FPR_e fd, FPR_e fs1, FPR_e fs2);
+
+    /// Create an FPUi or FPUl instruction with a register operands, an
+    /// immediate, and a register destination.
+    /// @param i The instruction.
+    /// @param pred The predicate register under which the instruction is
+    /// executed.
+    /// @param fd The destination register.
+    /// @param fs1 The first operand register.
+    /// @param imm2 The second immediate operand.
+    static instruction_data_t mk_FPUil(const instruction_t &i, PRR_e pred,
+                                       FPR_e rd, FPR_e rs1, word_t imm2);
+
+    /// Create an FPUrs instruction with two register operands and a register
+    /// destination.
+    /// @param i The instruction.
+    /// @param pred The predicate register under which the instruction is
+    /// executed.
+    /// @param fd The destination register.
+    /// @param fs1 The first operand register.
+    static instruction_data_t mk_FPUrs(const instruction_t &i, PRR_e pred,
+                                      FPR_e fd, FPR_e fs1);
+
+    /// Create an FPCt instruction with a register operand and a floating
+    /// register destination.
+    /// @param i The instruction.
+    /// @param pred The predicate register under which the instruction is
+    /// executed.
+    /// @param fd The floating destination register.
+    /// @param fs1 The register operand.
+    static instruction_data_t mk_FPCt(const instruction_t &i, PRR_e pred,
+                                      FPR_e fd, GPR_e rs1);
+
+    /// Create an FPCf instruction with a floating register operand and a
+    /// register destination.
+    /// @param i The instruction.
+    /// @param pred The predicate register under which the instruction is
+    /// executed.
+    /// @param fd The destination register.
+    /// @param fs The floating register operand.
+    static instruction_data_t mk_FPCf(const instruction_t &i, PRR_e pred,
+                                      GPR_e rd, FPR_e fs);
+
+    /// Create an FPUc instruction with two register operands and a predicate
+    /// register destination.
+    /// @param i The instruction.
+    /// @param pred The predicate register under which the instruction is
+    /// executed.
+    /// @param pd The predicate destination register.
+    /// @param fs1 The first operand register.
+    /// @param fs2 The second operand register.
+    static instruction_data_t mk_FPUc(const instruction_t &i, PRR_e pred,
+                                      PRR_e pd, FPR_e fs1, FPR_e fs2);
 
     // ------------------------ UTILITY ----------------------------------------
 

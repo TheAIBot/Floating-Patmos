@@ -1529,6 +1529,7 @@ namespace patmos
   LD_INSTR(lwus, s.Stack_cache, uword_t, uword_t)
   LD_INSTR(lhus, s.Stack_cache, uhword_t, uword_t)
   LD_INSTR(lbus, s.Stack_cache, ubyte_t, uword_t)
+  LD_INSTR(lss, s.Stack_cache, word_t, word_t)
 
   LD_INSTR(lwl , s.Local_memory, word_t, word_t)
   LD_INSTR(lhl , s.Local_memory, hword_t, word_t)
@@ -1536,6 +1537,7 @@ namespace patmos
   LD_INSTR(lwul, s.Local_memory, uword_t, uword_t)
   LD_INSTR(lhul, s.Local_memory, uhword_t, uword_t)
   LD_INSTR(lbul, s.Local_memory, ubyte_t, uword_t)
+  LD_INSTR(lsl, s.Local_memory, word_t, word_t)
 
   LD_INSTR(lwc , s.Data_cache, word_t, word_t)
   LD_INSTR(lhc , s.Data_cache, hword_t, word_t)
@@ -1543,6 +1545,7 @@ namespace patmos
   LD_INSTR(lwuc, s.Data_cache, uword_t, uword_t)
   LD_INSTR(lhuc, s.Data_cache, uhword_t, uword_t)
   LD_INSTR(lbuc, s.Data_cache, ubyte_t, uword_t)
+  LD_INSTR(lsc, s.Data_cache, word_t, word_t)
 
   LD_INSTR(lwm , s.Memory, word_t, word_t)
   LD_INSTR(lhm , s.Memory, hword_t, word_t)
@@ -1550,6 +1553,7 @@ namespace patmos
   LD_INSTR(lwum, s.Memory, uword_t, uword_t)
   LD_INSTR(lhum, s.Memory, uhword_t, uword_t)
   LD_INSTR(lbum, s.Memory, ubyte_t, uword_t)
+  LD_INSTR(lsm, s.Memory, word_t, word_t)
 
   /// Base class for memory store instructions.
   class i_stt_t : public i_pred_t
@@ -1693,18 +1697,22 @@ namespace patmos
   ST_INSTR(sws, s.Stack_cache, word_t)
   ST_INSTR(shs, s.Stack_cache, hword_t)
   ST_INSTR(sbs, s.Stack_cache, byte_t)
+  ST_INSTR(sss, s.Stack_cache, word_t)
 
   ST_INSTR(swl, s.Local_memory, word_t)
   ST_INSTR(shl, s.Local_memory, hword_t)
   ST_INSTR(sbl, s.Local_memory, byte_t)
+  ST_INSTR(ssl, s.Local_memory, word_t)
 
   ST_INSTR(swc, s.Data_cache, word_t)
   ST_INSTR(shc, s.Data_cache, hword_t)
   ST_INSTR(sbc, s.Data_cache, byte_t)
+  ST_INSTR(ssc, s.Data_cache, word_t)
 
   ST_INSTR(swm, s.Memory, word_t)
   ST_INSTR(shm, s.Memory, hword_t)
   ST_INSTR(sbm, s.Memory, byte_t)
+  ST_INSTR(ssm, s.Memory, word_t)
 
 
   class i_stc_t : public i_pred_t
@@ -2671,6 +2679,112 @@ namespace patmos
       return 3;
     }
   };
+
+#define FPUr_INSTR(name) \
+  class i_ ## name ## _t : public i_pred_t \
+  { \
+  public: \
+    virtual void print(std::ostream &os, const instruction_data_t &ops, \
+                       const symbol_map_t &symbols) const \
+    { \
+      printPred(os, ops.Pred); \
+      os << boost::format("%1% f%2% = f%3%, f%4%") % #name \
+          % ops.OPS.FPUr.Fd % ops.OPS.FPUr.Fs1 % ops.OPS.FPUr.Fs2; \
+    } \
+  };
+
+FPUr_INSTR(fadds)
+FPUr_INSTR(fsubs)
+FPUr_INSTR(fmuls)
+FPUr_INSTR(fdivs)
+FPUr_INSTR(fsgnjs)
+FPUr_INSTR(fsgnjns)
+FPUr_INSTR(fsgnjxs)
+
+#define FPUl_INSTR(name) \
+  class i_ ## name ## _t : public i_pred_t \
+  { \
+  public: \
+    virtual void print(std::ostream &os, const instruction_data_t &ops, \
+                       const symbol_map_t &symbols) const \
+    { \
+      printPred(os, ops.Pred); \
+      os << boost::format("%1% f%2% = f%3%, %4%") % #name \
+          % ops.OPS.FPUil.Fd % ops.OPS.FPUil.Fs1 % ops.OPS.FPUil.Imm2; \
+    } \
+  };
+  
+FPUl_INSTR(faddsl)
+FPUl_INSTR(fsubsl)
+FPUl_INSTR(fmulsl)
+FPUl_INSTR(fdivsl)
+
+#define FPUrs_INSTR(name) \
+  class i_ ## name ## _t : public i_pred_t \
+  { \
+  public: \
+    virtual void print(std::ostream &os, const instruction_data_t &ops, \
+                       const symbol_map_t &symbols) const \
+    { \
+      printPred(os, ops.Pred); \
+      os << boost::format("%1% f%2% = f%3%") % #name \
+          % ops.OPS.FPUrs.Fd % ops.OPS.FPUrs.Fs1; \
+    } \
+  };
+  
+FPUrs_INSTR(fsqrts)
+
+#define FPCt_INSTR(name) \
+  class i_ ## name ## _t : public i_pred_t \
+  { \
+  public: \
+    virtual void print(std::ostream &os, const instruction_data_t &ops, \
+                       const symbol_map_t &symbols) const \
+    { \
+      printPred(os, ops.Pred); \
+      os << boost::format("%1% f%2% = r%3%") % #name \
+          % ops.OPS.FPCt.Fd % ops.OPS.FPCt.Rs1; \
+    } \
+  };
+  
+FPCt_INSTR(fcvtis)
+FPCt_INSTR(fcvtus)
+FPCt_INSTR(fmvis)
+
+#define FPCf_INSTR(name) \
+  class i_ ## name ## _t : public i_pred_t \
+  { \
+  public: \
+    virtual void print(std::ostream &os, const instruction_data_t &ops, \
+                       const symbol_map_t &symbols) const \
+    { \
+      printPred(os, ops.Pred); \
+      os << boost::format("%1% r%2% = f%3%") % #name \
+          % ops.OPS.FPCf.Rd % ops.OPS.FPCf.Fs; \
+    } \
+  };
+  
+FPCf_INSTR(fcvtsi)
+FPCf_INSTR(fcvtsu)
+FPCf_INSTR(fmvsi)
+FPCf_INSTR(fclasss)
+
+#define FPUc_INSTR(name) \
+  class i_ ## name ## _t : public i_pred_t \
+  { \
+  public: \
+    virtual void print(std::ostream &os, const instruction_data_t &ops, \
+                       const symbol_map_t &symbols) const \
+    { \
+      printPred(os, ops.Pred); \
+      os << boost::format("%1% p%2% = f%3%, f%4%") % #name \
+          % ops.OPS.FPUc.Pd % ops.OPS.FPUc.Fs1 % ops.OPS.FPUc.Fs2; \
+    } \
+  };
+
+FPUc_INSTR(feqs)
+FPUc_INSTR(flts)
+FPUc_INSTR(fles)
 }
 
 #endif // PATMOS_INSTRUCTIONS_H

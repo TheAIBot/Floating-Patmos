@@ -80,6 +80,8 @@ namespace patmos
 
     bool get_value(word_t &value, bool negate) const;
 
+    bool get_value(single_t &value, bool negate) const;
+
     bool is_name() const;
 
     bool is_digit() const;
@@ -120,7 +122,12 @@ namespace patmos
     bool parse_expression(word_t &value, reloc_info_t &reloc,
                           bool require_paren);
 
+    bool parse_expression(single_t &value, reloc_info_t &reloc,
+                          bool require_paren);
+
     bool parse_GPR(GPR_e &reg);
+
+    bool parse_FPR(FPR_e &reg);
 
     bool parse_SPR(SPR_e &reg);
 

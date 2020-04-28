@@ -106,10 +106,10 @@
     MK_INSTR(lbul , ldt, 17)
     MK_INSTR(lbuc , ldt, 18)
     MK_INSTR(lbum , ldt, 19)
-	MK_SINSTR(flss, ldt, 20)
-    MK_INSTR(flsl , ldt, 21)
-    MK_INSTR(flsc , ldt, 22)
-    MK_INSTR(flsm , ldt, 23)
+	MK_SINSTR(lss, ldt, 20) // floating-point extension instruction
+    MK_INSTR(lsl , ldt, 21) // floating-point extension instruction
+    MK_INSTR(lsc , ldt, 22) // floating-point extension instruction
+    MK_INSTR(lsm , ldt, 23) // floating-point extension instruction
 
     // STT
     MK_SINSTR(sws, stt,  0)
@@ -124,10 +124,10 @@
     MK_INSTR(sbl , stt,  9)
     MK_INSTR(sbc , stt, 10)
     MK_INSTR(sbm , stt, 11)
-	MK_SINSTR(fsss, stt, 12)
-    MK_INSTR(fssl , stt, 13)
-    MK_INSTR(fssc , stt, 14)
-    MK_INSTR(fssm , stt, 15)
+	MK_SINSTR(sss, stt, 12) // floating-point extension instruction
+    MK_INSTR(ssl , stt, 13) // floating-point extension instruction
+    MK_INSTR(ssc , stt, 14) // floating-point extension instruction
+    MK_INSTR(ssm , stt, 15) // floating-point extension instruction
 
     // STCi
     MK_INSTR(sres  , stci, 0)
@@ -174,10 +174,10 @@
 	MK_INSTR(fsgnjxs, fpur,  6)
 	
 	// FPUl
-	MK_NINSTR(faddsl,   faddsl  , fpul, 0)
-	MK_NINSTR(fsubsl  , fsubsl  , fpul, 1)
-	MK_NINSTR(fmulsl  , fmulsl  , fpul, 2)
-	MK_NINSTR(fdivsl  , fdivsl  , fpul, 3)
+	MK_INSTR(faddsl  , fpul, 0)
+	MK_INSTR(fsubsl  , fpul, 1)
+	MK_INSTR(fmulsl  , fpul, 2)
+	MK_INSTR(fdivsl  , fpul, 3)
 	
 	// FPUrs
 	MK_INSTR(fsqrts, fpurs,  0)
