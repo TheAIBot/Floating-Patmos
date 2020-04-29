@@ -16,3 +16,4 @@ poseidon/
 patmos/simulator/build/src/libpatmos-simulator.a
 patmos/simulator/build/Testing/
 patmos/target/
+patmos/asm-tests/ISATestsGen/out/
