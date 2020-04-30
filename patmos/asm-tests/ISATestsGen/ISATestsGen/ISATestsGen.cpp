@@ -23,6 +23,7 @@ public:
 		expectedFile(std::ofstream(expfilepath + '/' + filename + ".txt"))
 	{
 		asmFile << ".word 100" << '\n';
+		asmFile << "nop" << '\n'; // first instruction is apparently not executed
 	}
 
 	void addInstr(std::string instr)
@@ -47,6 +48,10 @@ public:
 
 	void close()
 	{
+		asmFile << "halt" << '\n';
+		asmFile << "nop" << '\n';
+		asmFile << "nop" << '\n';
+		asmFile << "nop" << '\n';
 		asmFile.close();
 		expectedFile.close();
 	}
