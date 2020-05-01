@@ -254,15 +254,18 @@ public:
 		InstrFormat instrAFormat = getInstrFormat(instrA);
 		bool hasLongImm = instrAFormat == InstrFormat::ALUl || instrAFormat == InstrFormat::FPUl;
 
+		bool hasHalted = false;
 		if (isDual && !hasLongImm)
 		{
-			execute(instrA, 0, false);
+			hasHalted = execute(instrA, 0, false);
 			execute(instrB, 0, false);
 		}
 		else
 		{
-			return execute(instrA, instrB, true);
+			hasHalted = execute(instrA, instrB, true);
 		}
+
+		return hasHalted;
 	}
 
 	std::vector<uint8_t>* getUart()
