@@ -6,6 +6,7 @@
 #include <string>
 #include <functional>
 #include <limits>
+#include <cmath>
 #include "ISATestsGen.h"
 
 std::string TESTS_DIR_ASM = "../tests/asm";
@@ -290,7 +291,7 @@ int main()
 	makeFPUlTest("fdivsl", std::divides<float>());
 
 	// FPUrs tests
-	makeFPUrsTest("fsqrts", std::sqrtf);
+	makeFPUrsTest("fsqrts", [](float a) { return std::sqrt(a); });
 
 	// FPCt tests
 	makeFPCtTest("fcvtis", [](int32_t a) { return static_cast<float>(a); });

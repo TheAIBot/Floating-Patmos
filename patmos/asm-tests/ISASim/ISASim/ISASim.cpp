@@ -10,6 +10,8 @@
 #include <vector>
 #include <stdexcept>
 #include <immintrin.h>
+#include <cmath>
+#include <memory>
 #include "ISASim.h"
 
 int32_t classifyFloat(float a)
@@ -129,7 +131,14 @@ InstrFormat getInstrFormat(uint32_t instr)
 uint32_t getInstrPart(uint32_t instr, uint32_t mask)
 {
 	unsigned long index;
+#ifdef __linux__
+	index = __builtin_ctz(mask);
+#elif _WIN32
 	_BitScanForward(&index, mask);
+#else
+	static_assert(false, R"(Platform was detected as neither linux or windows.
+You need to write the platform specific way to call the bsf instruction here.)");
+#endif
 	return (instr & mask) >> index;
 }
 
@@ -140,36 +149,12 @@ private:
 	std::array<float, 32> FPRs;
 	uint8_t PRRs;
 	std::array<uint32_t, 16> SPRs;
-	std::unique_ptr < std::vector<uint8_t>> LocalMemory;
-	std::unique_ptr < std::vector<uint8_t>> GlobalMemory;
-	std::unique_ptr < std::vector<uint32_t>> InstrMemory;
+	std::unique_ptr<std::vector<uint8_t>> LocalMemory;
+	std::unique_ptr<std::vector<uint8_t>> GlobalMemory;
+	std::unique_ptr<std::vector<uint32_t>> InstrMemory;
+	std::unique_ptr<std::vector<uint8_t>> UartOutput;
 	int32_t PC;
 	int32_t Base;
-
-public:
-	simulator(std::unique_ptr < std::vector<uint32_t>> instructions)
-	{
-		std::fill(GPRs.begin(), GPRs.end(), 0);
-		std::fill(FPRs.begin(), FPRs.end(), 0.0f);
-		PRRs = 0b0000'0001;
-		std::fill(SPRs.begin(), SPRs.end(), 0);
-
-		LocalMemory = std::make_unique<std::vector<uint8_t>>();
-		GlobalMemory = std::make_unique<std::vector<uint8_t>>();
-		InstrMemory = std::move(instructions);
-
-		// we are just gonna ignore all the
-		// memory mapped stuff
-		const int32_t localMemorySize = 2048; // 2^11
-		const int32_t globalMemorySize = 2097152; // 2^21
-
-		LocalMemory->reserve(localMemorySize);
-		GlobalMemory->reserve(globalMemorySize);
-
-		PC = 0;
-		Base = 0;
-	}
-
 
 	uint32_t getGPR(int32_t gpr) { return GPRs[gpr]; }
 	void setGPR(int32_t gpr, uint32_t value) 
@@ -210,6 +195,55 @@ public:
 		}
 	}
 
+	void SetLocalMemory(uint32_t address, uint32_t value)
+	{
+		if (address == 0xf0080004)
+		{
+			UartOutput->push_back(value);
+		}
+		else 
+		{
+			throw std::runtime_error("The simulator only supports read/write to uart memory.");
+		}
+	}
+
+	uint32_t GetLocalMemory(uint32_t address)
+	{
+		if (address == 0xf0080000)
+		{
+			return 1;
+		}
+		else 
+		{
+			throw std::runtime_error("The simulator only supports read/write to uart memory.");
+		}
+	}
+
+public:
+	simulator(std::unique_ptr<std::vector<uint32_t>> instructions)
+	{
+		std::fill(GPRs.begin(), GPRs.end(), 0);
+		std::fill(FPRs.begin(), FPRs.end(), 0.0f);
+		PRRs = 0b0000'0001;
+		std::fill(SPRs.begin(), SPRs.end(), 0);
+
+		LocalMemory = std::make_unique<std::vector<uint8_t>>();
+		GlobalMemory = std::make_unique<std::vector<uint8_t>>();
+		InstrMemory = std::move(instructions);
+		UartOutput = std::make_unique<std::vector<uint8_t>>();
+
+		// we are just gonna ignore all the
+		// memory mapped stuff
+		const int32_t localMemorySize = 2048; // 2^11
+		const int32_t globalMemorySize = 2097152; // 2^21
+
+		LocalMemory->reserve(localMemorySize);
+		GlobalMemory->reserve(globalMemorySize);
+
+		PC = 0;
+		Base = 0;
+	}
+
 	bool tick()
 	{
 		uint32_t instrA = (*InstrMemory)[PC];
@@ -231,29 +265,36 @@ public:
 		}
 	}
 
+	std::vector<uint8_t>* getUart()
+	{
+		return UartOutput.get();
+	}
+
+private:
 	bool execute(uint32_t instr, uint32_t longImm, bool hasLong)
 	{
 		InstrFormat iFormat = getInstrFormat(instr);
-		uint32_t pred  = getInstrPart(instr, 0b01111000000000000000000000000000);
-		uint32_t rd    = getInstrPart(instr, 0b00000000001111100000000000000000);
-		uint32_t pd    = getInstrPart(instr, 0b00000000000011100000000000000000);
-		uint32_t rs1   = getInstrPart(instr, 0b00000000000000011111000000000000);
-		uint32_t ps1   = getInstrPart(instr, 0b00000000000000001111000000000000);
-		uint32_t rs2   = getInstrPart(instr, 0b00000000000000000000111110000000);
-		uint32_t ps2   = getInstrPart(instr, 0b00000000000000000000011110000000);
-		uint32_t imm   = getInstrPart(instr, 0b00000000000000000000111111111111);
-		uint32_t immc  = getInstrPart(instr, 0b00000000000000000000111110000000);
-		uint32_t immb  = getInstrPart(instr, 0b00000000000000000000111110000000);
-		uint32_t alubps= getInstrPart(instr, 0b00000000000000000000000000001111);
-		uint32_t sd    = getInstrPart(instr, 0b00000000000000000000000000001111);
-		uint32_t ss    = getInstrPart(instr, 0b00000000000000000000000000001111);
-		uint32_t delay = getInstrPart(instr, 0b00000000010000000000000000000000);
-		uint32_t immcfl= getInstrPart(instr, 0b00000000001111111111111111111111);
+		uint32_t pred    = getInstrPart(instr, 0b01111000'00000000'00000000'00000000);
+		uint32_t rd      = getInstrPart(instr, 0b00000000'00111110'00000000'00000000);
+		uint32_t pd      = getInstrPart(instr, 0b00000000'00001110'00000000'00000000);
+		uint32_t rs1     = getInstrPart(instr, 0b00000000'00000001'11110000'00000000);
+		uint32_t ps1     = getInstrPart(instr, 0b00000000'00000000'11110000'00000000);
+		uint32_t rs2     = getInstrPart(instr, 0b00000000'00000000'00001111'10000000);
+		uint32_t ps2     = getInstrPart(instr, 0b00000000'00000000'00000111'10000000);
+		uint32_t imm     = getInstrPart(instr, 0b00000000'00000000'00001111'11111111);
+		uint32_t immc    = getInstrPart(instr, 0b00000000'00000000'00001111'10000000);
+		uint32_t immb    = getInstrPart(instr, 0b00000000'00000000'00001111'10000000);
+		uint32_t alubps  = getInstrPart(instr, 0b00000000'00000000'00000000'00001111);
+		uint32_t sd      = getInstrPart(instr, 0b00000000'00000000'00000000'00001111);
+		uint32_t ss      = getInstrPart(instr, 0b00000000'00000000'00000000'00001111);
+		uint32_t delay   = getInstrPart(instr, 0b00000000'01000000'00000000'00000000);
+		uint32_t immcfl  = getInstrPart(instr, 0b00000000'00111111'11111111'11111111);
+		uint32_t immmem  = getInstrPart(instr, 0b00000000'00000000'00000000'01111111);
 
 		if (!(getPRR(pred & 0b111) ^ (pred >> 3)))
 		{
 			PC += hasLong ? 2 : 1;
-			return;
+			return false;
 		}
 
 		uint32_t aluFunc;
@@ -315,6 +356,13 @@ public:
 			fpuOp2 = getFPR(rs2);
 		}
 		uint32_t fpuFunc = aluFunc;
+
+		uint32_t ldtFunc = rs2;
+		uint32_t ldtOpa = getGPR(rs1);
+
+		uint32_t sttFunc = rd;
+		uint32_t sttOpa = getGPR(rs1);
+		uint32_t sttOps = getGPR(rs2);
 
 		bool halt = false;
 
@@ -445,10 +493,26 @@ public:
 			PC++;
 			break;
 		case InstrFormat::LDT:
-			// not implemented yet
+			switch (ldtFunc)
+			{
+			case 0b00001:
+				setGPR(rd, GetLocalMemory(ldtOpa + (immmem << 2)));
+				break;
+			default:
+				throw std::runtime_error("Simulator only support read/write to uart memory with lwl.");
+			}
+			PC++;
 			break;
 		case InstrFormat::STT:
-			// not implemented yet
+			switch (sttFunc)
+			{
+			case 0b00001:
+				SetLocalMemory(sttOpa + (immmem << 2), sttOps);
+				break;
+			default:
+				throw std::runtime_error("Simulator only support read/write to uart memory with lwl.");
+			}
+			PC++;
 			break;
 		case InstrFormat::STCi:
 			// not implemented yet
@@ -644,7 +708,7 @@ public:
 			switch (fpuFunc)
 			{
 			case 0b0000:
-				setFPR(rd, std::sqrtf(fpuOp1));
+				setFPR(rd, std::sqrt(fpuOp1));
 				break;
 			default:
 				throw std::runtime_error("Invalid FPUrs func: " + std::to_string(fpuFunc));
@@ -661,8 +725,10 @@ public:
 				setFPR(rd, (float)(uint32_t)getGPR(rs1));
 				break;
 			case 0b0010:
+            {
 				uint32_t tmp = getGPR(rs1);
 				setFPR(rd, reinterpret_cast<float&>(tmp));
+            }
 				break;
 			default:
 				throw std::runtime_error("Invalid FPCt func: " + std::to_string(fpuFunc));
@@ -679,8 +745,10 @@ public:
 				setGPR(rd, (uint32_t)getFPR(rs1));
 				break;
 			case 0b0010:
+            {
 				float tmp = getFPR(rs1);
 				setGPR(rd, reinterpret_cast<uint32_t&>(tmp));
+            }
 				break;
 			case 0b0011:
 				setGPR(rd, classifyFloat(getFPR(rs1)));
@@ -715,7 +783,50 @@ public:
 	}
 };
 
-int main()
+int main(int argc, char const *argv[])
 {
+	if (argc != 3)
+	{
+		std::cerr << "Usage: ISASim <input .bin> <output uart>" << std::endl;
+		return 1;
+	}
+
+	std::string binFilePath = argv[1];
+	std::string uartFilePath = argv[2];
+
+	try
+	{
+		std::ifstream inputFile(binFilePath);
+		std::ofstream outputFile(uartFilePath);
+
+		// read binary file
+		auto instructions = std::make_unique<std::vector<uint32_t>>();
+		while (inputFile.good())
+		{
+			uint32_t instr;
+			inputFile >> instr;
+			instructions->push_back(instr);
+		}
+		inputFile.close();
+
+		simulator sim(std::move(instructions));
+
+		while (!sim.tick())
+		{
+		}
+
+		auto uartResult = sim.getUart();
+		for (size_t i = 0; i < uartResult->size(); i++)
+		{
+			outputFile << (*uartResult)[i];
+		}
+		outputFile.close();
+	}
+	catch(const std::exception& e)
+	{
+		std::cerr << e.what() << std::endl;
+		return 1;
+	}
+	
 	return 0;
 }
