@@ -113,10 +113,10 @@ public:
 #Send r26 to uart
 #Wait for uart to be ready
 uart1:	add 	r28 = r0, 0xf0080000
-x2:		lwl     r27  = [r28 + 0]
+t2:		lwl     r27  = [r28 + 0]
 		nop
 		btest p1 = r27, r0
-	(!p1)	brnd	x2
+	(!p1)	brnd	t2
 # Write r26 to uart
 		swl	[r28 + 1] = r26
 		sri r26 = r26, 8
@@ -141,7 +141,7 @@ void make_Xd_Rs1_Rs2_Instr(std::string instrName, std::string regType, std::func
 		{
 			test.setGPReg("r1", values[x]);
 			test.setGPReg("r2", values[y]);
-			test.addInstr(instrName + regType + "3 = r1, r2");
+			test.addInstr(instrName + " " + regType + "3 = r1, r2");
 			test.expectRegisterValue(regType + "3", op(values[x], values[y]));
 		}
 	}
@@ -157,7 +157,7 @@ void make_Xd_Rs1_Imm_Instr(std::string instrName, std::string regType, std::func
 		for (size_t y = 0; y < immValues.size(); y++)
 		{
 			test.setGPReg("r1", valuesA[x]);
-			test.addInstr(instrName + regType + "3 = r1, " + std::to_string(immValues[y]));
+			test.addInstr(instrName + " " + regType + "3 = r1, " + std::to_string(immValues[y]));
 			test.expectRegisterValue(regType + "3", op(valuesA[x], immValues[y]));
 		}
 	}
@@ -181,7 +181,7 @@ void makeALUlTest(std::string instrName, std::function<int32_t(int32_t, int32_t)
 	make_Xd_Rs1_Imm_Instr(instrName, "r", op, immValues);
 }
 
-void makeALUmTest(std::string instrName, std::function<int32_t(int32_t, int32_t)> opL, std::function<int32_t(int32_t, int32_t)> opH)
+void makeALUmTest(std::string instrName, std::function<int32_t(uint32_t, uint32_t)> opL, std::function<int32_t(uint32_t, uint32_t)> opH)
 {
 	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
 	std::vector<int32_t> values{ 0, 1, 3, -5, -7, 27893, -8793, 7984, -977393, -1 };
@@ -220,7 +220,7 @@ void makeALUpTest(std::string instrName, std::function<bool(bool, bool)> op)
 		{
 			test.setPred("p1", values[x]);
 			test.setPred("p2", values[y]);
-			test.addInstr(instrName + "p3 = p1, p2");
+			test.addInstr(instrName + " p3 = p1, p2");
 			test.expectRegisterValue("p3", op(values[x], values[y]));
 		}
 	}
@@ -241,7 +241,7 @@ void makeALUbTest(std::string instrName, std::function<int32_t(int32_t, int32_t,
 			{
 				test.setGPReg("r1", valuesA[x]);
 				test.setPred("p2", predValues[y]);
-				test.addInstr(instrName + "r3 = r1, " + std::to_string(immValues[y]) + ", p2");
+				test.addInstr(instrName + " r3 = r1, " + std::to_string(immValues[y]) + ", p2");
 				test.expectRegisterValue("r3", op(valuesA[x], immValues[y], predValues[y]));
 			}
 		}
@@ -256,7 +256,7 @@ void makeSPCtfTest(std::string instrName)
 	for (size_t x = 0; x < values.size(); x++)
 	{
 		test.setGPReg("r1", values[x]);
-		test.addInstr(instrName + "s3 = r1");
+		test.addInstr(instrName + " s3 = r1");
 		test.expectRegisterValue("s3", values[x]);
 	}
 	test.close();
@@ -287,13 +287,13 @@ void makeBranchDelayTest(std::string instrName, int32_t delay)
 			test.addInstr("nop");
 		}
 
+		test.addInstr("x" + std::to_string(x) + ": nop");
+
 		for (int32_t y = 0; y < delay; y++)
 		{
 			test.expectRegisterValue("r" + std::to_string(y + 1), y + 2 + x);
 		}
 		test.expectRegisterValue("r" + std::to_string(delay + 1), x + 1);
-
-		test.addInstr("x" + std::to_string(x) + ": nop");
 
 	}
 	test.close();
@@ -325,13 +325,13 @@ void makeBranchNoDelayTest(std::string instrName)
 			test.addInstr("nop");
 		}
 
+		test.addInstr("x" + std::to_string(x) + ": nop");
+
 		for (int32_t y = 0; y < delay; y++)
 		{
 			test.expectRegisterValue("r" + std::to_string(y + 1), x + 1);
 		}
 		test.expectRegisterValue("r" + std::to_string(delay + 1), x + 1);
-
-		test.addInstr("x" + std::to_string(x) + ": nop");
 
 	}
 	test.close();
@@ -587,9 +587,10 @@ int main(int argc, char const *argv[])
 	makeALUiTest("srai", [](int32_t a, int32_t b) { return a >> (b & 0xf); });
 	makeALUiTest("ori", std::bit_or<int32_t>());
 	makeALUiTest("andi", std::bit_and<int32_t>());
-	makeALUiTest("nori", [](int32_t a, int32_t b) { return ~(a | b); });
-	makeALUiTest("shaddi", [](int32_t a, int32_t b) { return (a << 1) + b; });
-	makeALUiTest("shadd2i", [](int32_t a, int32_t b) { return (a << 2) + b; });
+	//these don't actually exist even though the book say they do
+	//makeALUiTest("nori", [](int32_t a, int32_t b) { return ~(a | b); });
+	//makeALUiTest("shaddi", [](int32_t a, int32_t b) { return (a << 1) + b; });
+	//makeALUiTest("shadd2i", [](int32_t a, int32_t b) { return (a << 2) + b; });
 
 	// ALUl
 	makeALUiTest("addl", std::plus<int32_t>());
@@ -605,8 +606,8 @@ int main(int argc, char const *argv[])
 	makeALUiTest("shadd2l", [](int32_t a, int32_t b) { return (a << 2) + b; });
 
 	// ALUm
-	makeALUmTest("mul" , [](int32_t a, int32_t b) { return (int64_t)a * (int64_t)b; }, [](int32_t a, int32_t b) { return ((int64_t)a * (int64_t)b) >> 32; });
-	makeALUmTest("mulu", [](int32_t a, int32_t b) { return (uint64_t)a * (uint64_t)b; }, [](int32_t a, int32_t b) { return ((uint64_t)a * (uint64_t)b) >> 32; });
+	makeALUmTest("mul" , [](uint32_t a, uint32_t b) { return (int64_t)a * (int64_t)b; }, [](uint32_t a, uint32_t b) { return (int64_t)(((int64_t)a * (int64_t)b)) >> 32; });
+	makeALUmTest("mulu", [](uint32_t a, uint32_t b) { return (uint64_t)a * (uint64_t)b; }, [](uint32_t a, uint32_t b) { return (uint64_t)(((uint64_t)a * (uint64_t)b)) >> 32; });
 
 	// ALUc
 	makeALUcTest("cmpeq", [](int32_t a, int32_t b) { return a == b; });
@@ -618,13 +619,13 @@ int main(int argc, char const *argv[])
 	makeALUcTest("btest", [](int32_t a, int32_t b) { return (a & (1 << b)) != 0; });
 
 	// ALUci
-	makeALUcTest("cmpieq", [](int32_t a, int32_t b) { return a == b; });
-	makeALUcTest("cmpineq", [](int32_t a, int32_t b) { return a != b; });
-	makeALUcTest("cmpilt", [](int32_t a, int32_t b) { return a < b; });
-	makeALUcTest("cmpile", [](int32_t a, int32_t b) { return a <= b; });
-	makeALUcTest("cmpiult", [](int32_t a, int32_t b) { return (uint32_t)a < (uint32_t)b; });
-	makeALUcTest("cmpiule", [](int32_t a, int32_t b) { return (uint32_t)a <= (uint32_t)b; });
-	makeALUcTest("btesti", [](int32_t a, int32_t b) { return (a & (1 << b)) != 0; });
+	makeALUciTest("cmpieq", [](int32_t a, int32_t b) { return a == b; });
+	makeALUciTest("cmpineq", [](int32_t a, int32_t b) { return a != b; });
+	makeALUciTest("cmpilt", [](int32_t a, int32_t b) { return a < b; });
+	makeALUciTest("cmpile", [](int32_t a, int32_t b) { return a <= b; });
+	makeALUciTest("cmpiult", [](int32_t a, int32_t b) { return (uint32_t)a < (uint32_t)b; });
+	makeALUciTest("cmpiule", [](int32_t a, int32_t b) { return (uint32_t)a <= (uint32_t)b; });
+	makeALUciTest("btesti", [](int32_t a, int32_t b) { return (a & (1 << b)) != 0; });
 
 	// ALUp
 	makeALUpTest("por" , [](bool a, bool b) { return a || b; });
@@ -635,7 +636,7 @@ int main(int argc, char const *argv[])
 	makeALUbTest("bcopy", [](int32_t a, int32_t b, bool pred) { return (a & ~(1 << b)) | (pred << b); });
 
 	// SPCt and SPCf
-	makeSPCtfTest("SPCt");
+	makeSPCtfTest("mts");
 
 	// CFLi Delayed
 	makeBranchDelayTest("call", 3);

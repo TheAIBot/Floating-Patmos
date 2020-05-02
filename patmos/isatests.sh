@@ -39,37 +39,40 @@ shopt -s nullglob
 for file in $(pwd)/asm-tests/tests/asm/*
 do
     tmpfilename=$(basename "$file" .s)
-    echo ""
-    echo "-- Testing ${tmpfilename} --"
+    #echo ""
+    #echo -n "Testing \t ${tmpfilename} ["
+    printf  "Testng %8s [" $tmpfilename
     
     #compile test to bin
-    echo -n "Compiling assembly:        "
+    #echo -n "Compiling assembly:        "
     if $PAASM_EXE_DIR/paasm "$file" $TESTS_BIN_DIR/$tmpfilename.bin > $LOG_FILE 2>&1 ; 
     then
-        echo "Done"
+        echo -n "-"
     else
-        echo "Error"
+        echo "Compile error"
         cat $LOG_FILE
-        exit 1
+        tests_fail=$(($tests_fail+1))
+        continue
     fi
     
     #get isa sim output
-    echo -n "Running simulator:         "
+    #echo -n "Running simulator:         "
     if $ISA_SIM_DIR/ISASim $TESTS_BIN_DIR/$tmpfilename.bin $TESTS_SIM_ACTUAL_DIR/$tmpfilename.uart > $LOG_FILE 2>&1 ; 
     then
-        echo "Done"
+        echo -n "-"
     else
-        echo "Error"
+        echo "Simulation error"
         cat $LOG_FILE
-        exit 1
+        tests_fail=$(($tests_fail+1))
+        continue
     fi
     
-    echo -n "Checking simulator result: "
+    #echo -n "Checking simulator result: "
     #compare isa sim output with expected output
     if cmp -s $TESTS_EXPECTED_DIR/$tmpfilename.uart $TESTS_SIM_ACTUAL_DIR/$tmpfilename.uart;
     then
         tests_succeed=$(($tests_succeed+1))
-        echo "Done"
+        echo "-]"
     else
         tests_fail=$(($tests_fail+1))
         echo "Error"
@@ -79,6 +82,8 @@ do
         echo "actual:"
         #hexdump $TESTS_SIM_ACTUAL_DIR/$tmpfilename.uart
         xxd -b -c 4 $TESTS_SIM_ACTUAL_DIR/$tmpfilename.uart
+        echo "diff:"
+        cmp -l $TESTS_EXPECTED_DIR/$tmpfilename.uart $TESTS_SIM_ACTUAL_DIR/$tmpfilename.uart
     fi
 done
 shopt -u nullglob
