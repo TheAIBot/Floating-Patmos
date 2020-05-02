@@ -21,3 +21,16 @@ patmos/asm-tests/ISASim/out/
 patmos/asm-tests/ISATestsGen/ISATestsGen/CMakeFiles/
 patmos/asm-tests/ISASim/ISASim/CMakeFiles/
 patmos/asm-tests/tests/
+
+ 
+/**/CMakeLists.txt.user
+/**/CMakeCache.txt
+/**/CMakeFiles
+/**/CMakeScripts
+/**/Testing
+/**/Makefile
+/**/cmake_install.cmake
+/**/install_manifest.txt
+/**/compile_commands.json
+/**/CTestTestfile.cmake
+/**/_deps

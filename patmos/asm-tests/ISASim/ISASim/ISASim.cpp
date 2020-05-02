@@ -20,15 +20,15 @@ int32_t classifyFloat(float a)
 	bool isQuietNan = (ai & (1 << 22)) != 0;
 
 	return (std::isnan(a) && !isQuietNan) << 9 |
-		(std::isnan(a)) << 8 |
-		(std::signbit(a) && std::isinf(a)) << 7 |
-		(std::signbit(a) && std::isnormal(a)) << 6 |
-		(std::signbit(a) && !std::isnormal(a)) << 5 |
-		(std::signbit(a) && a == 0.0) << 4 |
-		(!std::signbit(a) && a == 0.0) << 3 |
-		(!std::signbit(a) && !std::isnormal(a)) << 2 |
-		(!std::signbit(a) && std::isnormal(a)) << 1 |
-		(!std::signbit(a) && std::isinf(a)) << 0;
+		   (std::isnan(a) && isQuietNan) << 8 |
+		   (std::signbit(a) && std::isinf(a)) << 7 |
+		   (std::signbit(a) && std::isnormal(a)) << 6 |
+		   (std::signbit(a) && std::fpclassify(a) == FP_SUBNORMAL) << 5 |
+		   (std::signbit(a) && a == 0.0) << 4 |
+		   (!std::signbit(a) && a == 0.0) << 3 |
+		   (!std::signbit(a) && std::fpclassify(a) == FP_SUBNORMAL) << 2 |
+		   (!std::signbit(a) && std::isnormal(a)) << 1 |
+		   (!std::signbit(a) && std::isinf(a)) << 0;
 }
 
 enum class InstrFormat
@@ -878,13 +878,13 @@ private:
 			switch (fpuFunc)
 			{
 			case 0b0000:
-				setFPR(rd, fpuOp1 == fpuOp2);
+				setPRR(pd, fpuOp1 == fpuOp2);
 				break;
 			case 0b0001:
-				setFPR(rd, fpuOp1 < fpuOp2);
+				setPRR(pd, fpuOp1 < fpuOp2);
 				break;
 			case 0b0010:
-				setFPR(rd, fpuOp1 <= fpuOp2);
+				setPRR(pd, fpuOp1 <= fpuOp2);
 				break;
 			default:
 				break;

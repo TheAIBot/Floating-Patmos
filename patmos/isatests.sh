@@ -16,9 +16,9 @@ LOG_FILE=$(pwd)/testlog.log
 
 
 #compile programs
-pushd $ISA_GEN_DIR && cmake CMakeLists.txt && make && popd
-pushd $ISA_SIM_DIR && cmake CMakeLists.txt && make && popd
-pushd $PAASM_BUILD_DIR && make paasm && popd
+pushd $ISA_GEN_DIR && cmake CMakeLists.txt && make && popd || exit 1
+pushd $ISA_SIM_DIR && cmake CMakeLists.txt && make && popd || exit 1
+pushd $PAASM_BUILD_DIR && make paasm && popd || exit 1
 
 #make test directories
 mkdir -p $TESTS_ASM_DIR
@@ -30,6 +30,9 @@ mkdir -p $TESTS_HW_ACTUAL_DIR
 
 #generate tests
 $ISA_GEN_DIR/ISATestsGen $TESTS_ASM_DIR $TESTS_EXPECTED_DIR || exit 1
+
+tests_fail=0
+tests_succeed=0
 
 #compile asm to binary
 shopt -s nullglob
@@ -65,16 +68,25 @@ do
     #compare isa sim output with expected output
     if cmp -s $TESTS_EXPECTED_DIR/$tmpfilename.uart $TESTS_SIM_ACTUAL_DIR/$tmpfilename.uart;
     then
+        tests_succeed=$(($tests_succeed+1))
         echo "Done"
     else
+        tests_fail=$(($tests_fail+1))
         echo "Error"
         echo "expected:"
-        hexdump $TESTS_EXPECTED_DIR/$tmpfilename.uart
+        #hexdump $TESTS_EXPECTED_DIR/$tmpfilename.uart
+        xxd -b -c 4 $TESTS_EXPECTED_DIR/$tmpfilename.uart
         echo "actual:"
-        hexdump $TESTS_SIM_ACTUAL_DIR/$tmpfilename.uart
+        #hexdump $TESTS_SIM_ACTUAL_DIR/$tmpfilename.uart
+        xxd -b -c 4 $TESTS_SIM_ACTUAL_DIR/$tmpfilename.uart
     fi
 done
 shopt -u nullglob
+
+total_tests=$(($tests_succeed + $tests_fail))
+echo "Tests completed: ${total_tests}"
+echo "Tests failed:    ${tests_fail}"
+echo "Tests Succeeded: ${tests_succeed}"
 
 
 
