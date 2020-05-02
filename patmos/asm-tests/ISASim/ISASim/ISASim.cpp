@@ -155,6 +155,7 @@ private:
 	std::unique_ptr<std::vector<uint8_t>> UartOutput;
 	int32_t PC;
 	int32_t Base;
+	bool Verbose;
 
 	uint32_t getGPR(int32_t gpr) { return GPRs[gpr]; }
 	void setGPR(int32_t gpr, uint32_t value) 
@@ -219,6 +220,16 @@ private:
 		}
 	}
 
+	uint32_t getNextInstr(int32_t pcOffset = 0)
+	{
+		return (*InstrMemory)[Base + PC + pcOffset];
+	}
+
+	bool isBundle(uint32_t instr)
+	{
+		return (instr & 0x80000000) != 0;
+	}
+
 public:
 	simulator(std::unique_ptr<std::vector<uint32_t>> instructions)
 	{
@@ -241,15 +252,18 @@ public:
 		GlobalMemory->reserve(globalMemorySize);
 
 		PC = 0;
-		Base = 0;
+		Base = 1; // this is wrong but okay for now
+		//should really point to the first function
+		//to execute and right now it only points
+		//to the first instruction
 	}
 
 	bool tick()
 	{
-		uint32_t instrA = (*InstrMemory)[PC];
-		bool isDual = (instrA & 0x80000000) != 0;
+		uint32_t instrA = getNextInstr();
+		bool isDual = isBundle(instrA);
 
-		uint32_t instrB = isDual ? (*InstrMemory)[PC + 1] : 0;
+		uint32_t instrB = isDual ? getNextInstr(1) : 0;
 
 		InstrFormat instrAFormat = getInstrFormat(instrA);
 		bool hasLongImm = instrAFormat == InstrFormat::ALUl || instrAFormat == InstrFormat::FPUl;
@@ -257,12 +271,17 @@ public:
 		bool hasHalted = false;
 		if (isDual && !hasLongImm)
 		{
-			hasHalted = execute(instrA, 0, false);
-			execute(instrB, 0, false);
+			auto [halt, bundleDone] = execute(instrA, 0, false);
+			if (!bundleDone)
+			{
+				execute(instrB, 0, false);
+			}
+			hasHalted = halt;
 		}
 		else
 		{
-			hasHalted = execute(instrA, instrB, true);
+			auto [halt, _] = execute(instrA, instrB, hasLongImm);
+			hasHalted = halt;
 		}
 
 		return hasHalted;
@@ -273,8 +292,13 @@ public:
 		return UartOutput.get();
 	}
 
+	void setVerbose(bool value)
+	{
+		Verbose = value;
+	}
+
 private:
-	bool execute(uint32_t instr, uint32_t longImm, bool hasLong)
+	std::tuple<bool, bool> execute(uint32_t instr, uint32_t longImm, bool hasLong)
 	{
 		InstrFormat iFormat = getInstrFormat(instr);
 		uint32_t pred    = getInstrPart(instr, 0b01111000'00000000'00000000'00000000);
@@ -297,7 +321,7 @@ private:
 		if (!(getPRR(pred & 0b111) ^ (pred >> 3)))
 		{
 			PC += hasLong ? 2 : 1;
-			return false;
+			return std::make_tuple(false, false);
 		}
 
 		uint32_t aluFunc;
@@ -368,6 +392,7 @@ private:
 		uint32_t sttOps = getGPR(rs2);
 
 		bool halt = false;
+		bool bundleAlreadyExecuted = false;
 
 		switch (iFormat)
 		{
@@ -412,7 +437,7 @@ private:
 			default:
 				throw std::runtime_error("Invalid (ALUr or ALUi or ALUl) func: " + std::to_string(aluFunc));
 			}
-			PC++;
+			PC += hasLong ? 2 : 1;
 			break;
 		case InstrFormat::ALUm:
 			switch (aluFunc)
@@ -527,44 +552,81 @@ private:
 			switch (cflFunc)
 			{
 			case 0b000: // callnd
+				PC++;
+				if (isBundle(instr))
+				{
+					tick();
+					bundleAlreadyExecuted = true;
+				}
 				setSPR(7, Base);
 				setSPR(8, PC);
 				Base = immcfl;
-				PC = immcfl;
+				PC = 0;
 				break;
 			case 0b001: // call
-				setSPR(7, Base); // set before or after delay instructions?
+				PC++;
+				if (isBundle(instr))
+				{
+					tick();
+					bundleAlreadyExecuted = true;
+				}
+				tick();
+				tick();
+				tick();
+				setSPR(7, Base); // should be visible to delay instructions?
 				setSPR(8, PC);
 				Base = immcfl;
-				PC++;
-				tick();
-				tick();
-				tick();
-				PC = immcfl;
+				PC = 0;
 				break;
 			case 0b010: // brnd
+				if (isBundle(instr))
+				{
+					PC++;
+					tick();
+					bundleAlreadyExecuted = true;
+				}
 				PC += simmcfl;
 				break; 
 			case 0b011: // br
 			{
 				int32_t tmpPC = PC;
 				PC++;
+				if (isBundle(instr))
+				{
+					tick();
+					bundleAlreadyExecuted = true;
+				}
 				tick();
 				tick();
 				PC = tmpPC + simmcfl;
 			}
 				break;
 			case 0b100: // brcfnd
+				PC++;
+				if (isBundle(instr))
+				{
+					tick();
+					bundleAlreadyExecuted = true;
+				}
 				Base = immcfl;
-				PC = immcfl;
+				PC = 0;
 				break;
 			case 0b101: // brcf
 				PC++;
+				if (isBundle(instr))
+				{
+					tick();
+					bundleAlreadyExecuted = true;
+				}
 				tick();
 				tick();
 				tick();
 				Base = immcfl;
-				PC = immcfl;
+				PC = 0;
+				if (Base == 0)
+				{
+					halt = true;
+				}
 				break;
 			case 0b110:
 				throw std::runtime_error("Trap and exceptions are not supported.");
@@ -576,11 +638,22 @@ private:
 			switch (cflFunc)
 			{
 			case 0b000: // retnd
+				PC++;
+				if (isBundle(instr))
+				{
+					tick();
+					bundleAlreadyExecuted = true;
+				}
 				Base = getSPR(7);
 				PC = getSPR(8);
 				break;
 			case 0b001: // ret
 				PC++;
+				if (isBundle(instr))
+				{
+					tick();
+					bundleAlreadyExecuted = true;
+				}
 				tick();
 				tick();
 				tick();
@@ -588,11 +661,22 @@ private:
 				PC = getSPR(8);
 				break;
 			case 0b010: // xretnd
+				PC++;
+				if (isBundle(instr))
+				{
+					tick();
+					bundleAlreadyExecuted = true;
+				}
 				Base = getSPR(9);
 				PC = getSPR(10);
 				break;
 			case 0b011: // xret
 				PC++;
+				if (isBundle(instr))
+				{
+					tick();
+					bundleAlreadyExecuted = true;
+				}
 				tick();
 				tick();
 				tick();
@@ -607,26 +691,48 @@ private:
 			switch (cflFunc)
 			{
 			case 0b000: // callnd
+				PC++;
+				if (isBundle(instr))
+				{
+					tick();
+					bundleAlreadyExecuted = true;
+				}
 				setSPR(7, Base);
 				setSPR(8, PC);
 				Base = cflOp1 >> 2;
-				PC = cflOp1 >> 2;
+				PC = 0;
 				break;
 			case 0b001: // call
+				PC++;
+				if (isBundle(instr))
+				{
+					tick();
+					bundleAlreadyExecuted = true;
+				}
+				tick();
+				tick();
+				tick();
 				setSPR(7, Base); // set before or after delay instructions?
 				setSPR(8, PC);
 				Base = cflOp1 >> 2;
-				PC++;
-				tick();
-				tick();
-				tick();
-				PC = cflOp1 >> 2;
+				PC = 0;
 				break;
 			case 0b010: // brnd
+				PC++;
+				if (isBundle(instr))
+				{
+					tick();
+					bundleAlreadyExecuted = true;
+				}
 				PC = cflOp1 >> 2;
 				break;
 			case 0b011: // br
 				PC++;
+				if (isBundle(instr))
+				{
+					tick();
+					bundleAlreadyExecuted = true;
+				}
 				tick();
 				tick();
 				PC = cflOp1 >> 2;
@@ -639,20 +745,27 @@ private:
 			switch (cflFunc)
 			{
 			case 0b100: // brcfnd
-				Base = (cflOp1 >> 2);
-				PC = (cflOp1 >> 2) + (cflOp2 >> 2);
+				PC++;
+				if (isBundle(instr))
+				{
+					tick();
+					bundleAlreadyExecuted = true;
+				}
+				Base = cflOp1 >> 2;
+				PC = cflOp2 >> 2;
 				break;
 			case 0b101: // brcf
 				PC++;
-				tick();
-				tick();
-				tick();
-				Base = (cflOp1 >> 2);
-				PC = (cflOp1 >> 2) + (cflOp2 >> 2);
-				if (PC == 0)
+				if (isBundle(instr))
 				{
-					halt = true;
+					tick();
+					bundleAlreadyExecuted = true;
 				}
+				tick();
+				tick();
+				tick();
+				Base = cflOp1 >> 2;
+				PC = cflOp2 >> 2;
 				break;
 			default:
 				throw std::runtime_error("Invalid Op and delay combination for CFLrt format.");
@@ -705,7 +818,7 @@ private:
 			default:
 				throw std::runtime_error("Invalid FPUl func: " + std::to_string(fpuFunc));
 			}
-			PC++;
+			PC += 2;
 			break;
 		case InstrFormat::FPUrs:
 			switch (fpuFunc)
@@ -782,34 +895,58 @@ private:
 			throw std::runtime_error("Invalid instruction format.");
 		}
 
-		return halt;
+		return std::make_tuple(halt, bundleAlreadyExecuted);
 	}
 };
 
 int main(int argc, char const *argv[])
 {
+	
 	if (argc != 3)
 	{
 		std::cerr << "Usage: ISASim <input .bin> <output uart>" << std::endl;
 		return 1;
 	}
+	
 
 	std::string binFilePath = argv[1];
 	std::string uartFilePath = argv[2];
+	
+
+	//std::string binFilePath = "/home/cake/t-crest/patmos/asm-tests/tests/bin/fadds.bin";
+	//std::string uartFilePath = "/home/cake/t-crest/patmos/asm-tests/tests/isa-actual/fadds.uart";
+
+
 
 	try
 	{
-		std::ifstream inputFile(binFilePath);
-		std::ofstream outputFile(uartFilePath);
+		std::ifstream inputFile(binFilePath, std::ios::binary);
+		std::ofstream outputFile(uartFilePath, std::ios::binary);
 
 		// read binary file
 		auto instructions = std::make_unique<std::vector<uint32_t>>();
 		while (inputFile.good())
 		{
-			uint32_t instr;
-			inputFile >> instr;
+			uint32_t instr = 0;
+
+			// read into buffer
+			inputFile.read((char*)&instr, sizeof(uint32_t));
+
+			// check how much was read
+			std::streamsize count = inputFile.gcount();
+			if (count != sizeof(uint32_t) && count != 0)
+			{
+				throw std::runtime_error("The binary file was not a multiple of 4.");
+			}
+			else if (count == 0)
+			{
+				break;
+			}
+
+			instr = __builtin_bswap32(instr);
 			instructions->push_back(instr);
 		}
+		
 		inputFile.close();
 
 		simulator sim(std::move(instructions));
@@ -824,6 +961,8 @@ int main(int argc, char const *argv[])
 			outputFile << (*uartResult)[i];
 		}
 		outputFile.close();
+
+		std::cout << "simulation done." << std::endl;
 	}
 	catch(const std::exception& e)
 	{

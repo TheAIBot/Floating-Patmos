@@ -120,7 +120,7 @@ void makeFPUrTest(std::string instrName, std::function<float(float, float)> op)
 	float f2 = 1.0f;
 	float f3 = 3.27f;
 	float f4 = -5.78;
-	float f5 = 3.14159265359f;
+	float f5 = 3.141592f;
 	test.setFloatReg("f1", f1);
 	test.setFloatReg("f2", f2);
 	test.setFloatReg("f3", f3);
@@ -144,7 +144,7 @@ void makeFPUlTest(std::string instrName, std::function<float(float, float)> op)
 	float f2 = 1.0f;
 	float f3 = 3.27f;
 	float f4 = -5.78;
-	float f5 = 3.14159265359f;
+	float f5 = 3.141592f;
 	test.setFloatReg("f1", f1);
 	test.setFloatReg("f2", f2);
 	test.setFloatReg("f3", f3);
@@ -168,7 +168,7 @@ void makeFPUrsTest(std::string instrName, std::function<float(float)> op)
 	float f2 = 1.0f;
 	float f3 = 3.27f;
 	float f4 = -5.78;
-	float f5 = 3.14159265359f;
+	float f5 = 3.141592f;
 	test.setFloatReg("f1", f1);
 	test.setFloatReg("f2", f2);
 	test.setFloatReg("f3", f3);
@@ -220,7 +220,7 @@ void makeFPCfTest(std::string instrName, std::function<int32_t(float)> op)
 	float f2 = 1.0f;
 	float f3 = 3.27f;
 	float f4 = -5.78;
-	float f5 = 3.14159265359f;
+	float f5 = 3.141592f;
 	test.setFloatReg("f1", f1);
 	test.setFloatReg("f2", f2);
 	test.setFloatReg("f3", f3);
@@ -258,7 +258,7 @@ int32_t classifyFloat(float a)
 
 void makeClassifyTest(std::string instrName)
 {
-	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
+	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName + "2");
 	float f1 = std::numeric_limits<float>::signaling_NaN();
 	float f2 = std::numeric_limits<float>::quiet_NaN();
 	float f3 = std::copysign(std::numeric_limits<float>::infinity(), -0.0);
@@ -309,7 +309,7 @@ void makeFPUcTest(std::string instrName, std::function<bool(float, float)> op)
 	float f2 = 1.0f;
 	float f3 = 3.27f;
 	float f4 = -5.78;
-	float f5 = 3.14159265359f;
+	float f5 = 3.141592f;
 	test.setFloatReg("f1", f1);
 	test.setFloatReg("f2", f2);
 	test.setFloatReg("f3", f3);
