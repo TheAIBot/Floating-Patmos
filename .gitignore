@@ -21,6 +21,7 @@ patmos/asm-tests/ISASim/out/
 patmos/asm-tests/ISATestsGen/ISATestsGen/CMakeFiles/
 patmos/asm-tests/ISASim/ISASim/CMakeFiles/
 patmos/asm-tests/tests/
+patmos/asm/*.s
 
  
 /**/CMakeLists.txt.user

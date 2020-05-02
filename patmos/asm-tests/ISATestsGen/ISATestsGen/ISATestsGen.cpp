@@ -113,18 +113,21 @@ public:
 #Send r26 to uart
 #Wait for uart to be ready
 uart1:	add 	r28 = r0, 0xf0080000
+		add     r25 = r0, 4
 t2:		lwl     r27  = [r28 + 0]
 		nop
 		btest p1 = r27, r0
-	(!p1)	brnd	t2
+	(!p1)	br	t2
+		nop
+		nop
 # Write r26 to uart
 		swl	[r28 + 1] = r26
 		sri r26 = r26, 8
-		swl	[r28 + 1] = r26
-		sri r26 = r26, 8
-		swl	[r28 + 1] = r26
-		sri r26 = r26, 8
-		swl	[r28 + 1] = r26
+		sub r25 = r25, 1
+		cmpineq p1 = r25, 0
+	(p1)	br	t2
+		nop
+		nop
         retnd)" << '\n';
 		asmFile.close();
 		expectedFile.close();
@@ -134,7 +137,7 @@ t2:		lwl     r27  = [r28 + 0]
 void make_Xd_Rs1_Rs2_Instr(std::string instrName, std::string regType, std::function<int32_t(int32_t, int32_t)> op)
 {
 	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
-	std::vector<int32_t> values{ 0, 1, 3, -5, -7, 27893, -8793, 7984, -977393, -1 };
+	std::vector<int32_t> values{ 0, 1, 3, -5, 27893 };
 	for (size_t x = 0; x < values.size(); x++)
 	{
 		for (size_t y = 0; y < values.size(); y++)
@@ -151,7 +154,7 @@ void make_Xd_Rs1_Rs2_Instr(std::string instrName, std::string regType, std::func
 void make_Xd_Rs1_Imm_Instr(std::string instrName, std::string regType, std::function<int32_t(int32_t, int32_t)> op, std::vector<int32_t>& immValues)
 {
 	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
-	std::vector<int32_t> valuesA{ 3, 85, 217389, -8604, -5, -7, -893, -993, -1 };
+	std::vector<int32_t> valuesA{ 0, 1, 3, -5, 27893 };
 	for (size_t x = 0; x < valuesA.size(); x++)
 	{
 		for (size_t y = 0; y < immValues.size(); y++)
@@ -177,14 +180,14 @@ void makeALUiTest(std::string instrName, std::function<int32_t(int32_t, int32_t)
 
 void makeALUlTest(std::string instrName, std::function<int32_t(int32_t, int32_t)> op)
 {
-	std::vector<int32_t> immValues{ 3, 85, 217389, -8604, -5, -7, -893, -993, -1 };
+	std::vector<int32_t> immValues{ 85, 217389, -7, -1 };
 	make_Xd_Rs1_Imm_Instr(instrName, "r", op, immValues);
 }
 
 void makeALUmTest(std::string instrName, std::function<int32_t(uint32_t, uint32_t)> opL, std::function<int32_t(uint32_t, uint32_t)> opH)
 {
 	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
-	std::vector<int32_t> values{ 0, 1, 3, -5, -7, 27893, -8793, 7984, -977393, -1 };
+	std::vector<int32_t> values{ 0, 1, 3, -5, 27893 };
 	for (size_t x = 0; x < values.size(); x++)
 	{
 		for (size_t y = 0; y < values.size(); y++)
@@ -230,8 +233,8 @@ void makeALUpTest(std::string instrName, std::function<bool(bool, bool)> op)
 void makeALUbTest(std::string instrName, std::function<int32_t(int32_t, int32_t, bool)> op)
 {
 	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
-	std::vector<int32_t> valuesA{ 3, 85, 217389, -8604, -5, -7, -893, -993, -1 };
-	std::vector<int32_t> immValues{ 0, 1, 3, 17, 29 };
+	std::vector<int32_t> valuesA{ 85, 217389, -7, -1 };
+	std::vector<int32_t> immValues{ 0, 3, 29 };
 	std::vector<bool> predValues{ true, false };
 	for (size_t x = 0; x < valuesA.size(); x++)
 	{
@@ -252,7 +255,7 @@ void makeALUbTest(std::string instrName, std::function<int32_t(int32_t, int32_t,
 void makeSPCtfTest(std::string instrName)
 {
 	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
-	std::vector<int32_t> values{ 3, 85, 217389, -8604, -5, -7, -893, -993, -1 };
+	std::vector<int32_t> values{ 85, 217389, -7, -1 };
 	for (size_t x = 0; x < values.size(); x++)
 	{
 		test.setGPReg("r1", values[x]);
@@ -301,7 +304,7 @@ void makeBranchDelayTest(std::string instrName, int32_t delay)
 
 void makeBranchNoDelayTest(std::string instrName)
 {
-	int delay = 5;
+	int delay = 2;
 	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
 	std::vector<int32_t> values{ 0, 3, 17 };
 	for (int32_t x = 0; x < values.size(); x++)
