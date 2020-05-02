@@ -8,6 +8,8 @@
 #include <limits>
 #include <cmath>
 #include <charconv>
+#include <array>
+#include <vector>
 #include "ISATestsGen.h"
 
 std::string TESTS_DIR_ASM = "../tests/asm";
@@ -52,6 +54,18 @@ public:
 		addInstr("addl " + reg + " = r0, " + std::to_string(value));
 	}
 
+	void setPred(std::string reg, bool value)
+	{
+		if (value)
+		{
+			addInstr("cmpeq " + reg + " = r0, r0");
+		}
+		else
+		{
+			addInstr("cmpneq " + reg + " = r0, r0");
+		}
+	}
+
 	void expectRegisterValue(std::string reg, int32_t value)
 	{
 		expectedFile << ((uint8_t)(value >> 0));
@@ -70,7 +84,10 @@ public:
 		{
 			addInstr("bcopy r26 = r0, 0, " + reg);
 		}
-		
+		else if (reg[0] == 's')
+		{
+			addInstr("mfs r26 = " + reg);
+		}
 		else
 		{
 			throw std::runtime_error("Wanted to create a tests that expects the register "
@@ -113,6 +130,212 @@ x2:		lwl     r27  = [r28 + 0]
 		expectedFile.close();
 	}
 };
+
+void make_Xd_Rs1_Rs2_Instr(std::string instrName, std::string regType, std::function<int32_t(int32_t, int32_t)> op)
+{
+	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
+	std::vector<int32_t> values{ 0, 1, 3, -5, -7, 27893, -8793, 7984, -977393, -1 };
+	for (size_t x = 0; x < values.size(); x++)
+	{
+		for (size_t y = 0; y < values.size(); y++)
+		{
+			test.setGPReg("r1", values[x]);
+			test.setGPReg("r2", values[y]);
+			test.addInstr(instrName + regType + "3 = r1, r2");
+			test.expectRegisterValue(regType + "3", op(values[x], values[y]));
+		}
+	}
+	test.close();
+}
+
+void make_Xd_Rs1_Imm_Instr(std::string instrName, std::string regType, std::function<int32_t(int32_t, int32_t)> op, std::vector<int32_t>& immValues)
+{
+	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
+	std::vector<int32_t> valuesA{ 3, 85, 217389, -8604, -5, -7, -893, -993, -1 };
+	for (size_t x = 0; x < valuesA.size(); x++)
+	{
+		for (size_t y = 0; y < immValues.size(); y++)
+		{
+			test.setGPReg("r1", valuesA[x]);
+			test.addInstr(instrName + regType + "3 = r1, " + std::to_string(immValues[y]));
+			test.expectRegisterValue(regType + "3", op(valuesA[x], immValues[y]));
+		}
+	}
+	test.close();
+}
+
+void makeALUrTest(std::string instrName, std::function<int32_t(int32_t, int32_t)> op)
+{
+	make_Xd_Rs1_Rs2_Instr(instrName, "r", op);
+}
+
+void makeALUiTest(std::string instrName, std::function<int32_t(int32_t, int32_t)> op)
+{
+	std::vector<int32_t> immValues{ 0, 1, 3, 273, 794 };
+	make_Xd_Rs1_Imm_Instr(instrName, "r", op, immValues);
+}
+
+void makeALUlTest(std::string instrName, std::function<int32_t(int32_t, int32_t)> op)
+{
+	std::vector<int32_t> immValues{ 3, 85, 217389, -8604, -5, -7, -893, -993, -1 };
+	make_Xd_Rs1_Imm_Instr(instrName, "r", op, immValues);
+}
+
+void makeALUmTest(std::string instrName, std::function<int32_t(int32_t, int32_t)> opL, std::function<int32_t(int32_t, int32_t)> opH)
+{
+	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
+	std::vector<int32_t> values{ 0, 1, 3, -5, -7, 27893, -8793, 7984, -977393, -1 };
+	for (size_t x = 0; x < values.size(); x++)
+	{
+		for (size_t y = 0; y < values.size(); y++)
+		{
+			test.setGPReg("r1", values[x]);
+			test.setGPReg("r2", values[y]);
+			test.addInstr(instrName + " r1, r2");
+			test.expectRegisterValue("sl", opL(values[x], values[y]));
+			test.expectRegisterValue("sh", opH(values[x], values[y]));
+		}
+	}
+	test.close();
+}
+
+void makeALUcTest(std::string instrName, std::function<int32_t(int32_t, int32_t)> op)
+{
+	make_Xd_Rs1_Rs2_Instr(instrName, "p", op);
+}
+
+void makeALUciTest(std::string instrName, std::function<int32_t(int32_t, int32_t)> op)
+{
+	std::vector<int32_t> immValues{ 0, 1, 3, 17, 29 };
+	make_Xd_Rs1_Imm_Instr(instrName, "p", op, immValues);
+}
+
+void makeALUpTest(std::string instrName, std::function<bool(bool, bool)> op)
+{
+	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
+	std::vector<bool> values{ true, false };
+	for (size_t x = 0; x < values.size(); x++)
+	{
+		for (size_t y = 0; y < values.size(); y++)
+		{
+			test.setPred("p1", values[x]);
+			test.setPred("p2", values[y]);
+			test.addInstr(instrName + "p3 = p1, p2");
+			test.expectRegisterValue("p3", op(values[x], values[y]));
+		}
+	}
+	test.close();
+}
+
+void makeALUbTest(std::string instrName, std::function<int32_t(int32_t, int32_t, bool)> op)
+{
+	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
+	std::vector<int32_t> valuesA{ 3, 85, 217389, -8604, -5, -7, -893, -993, -1 };
+	std::vector<int32_t> immValues{ 0, 1, 3, 17, 29 };
+	std::vector<bool> predValues{ true, false };
+	for (size_t x = 0; x < valuesA.size(); x++)
+	{
+		for (size_t y = 0; y < immValues.size(); y++)
+		{
+			for (size_t z = 0; z < predValues.size(); z++)
+			{
+				test.setGPReg("r1", valuesA[x]);
+				test.setPred("p2", predValues[y]);
+				test.addInstr(instrName + "r3 = r1, " + std::to_string(immValues[y]) + ", p2");
+				test.expectRegisterValue("r3", op(valuesA[x], immValues[y], predValues[y]));
+			}
+		}
+	}
+	test.close();
+}
+
+void makeSPCtfTest(std::string instrName)
+{
+	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
+	std::vector<int32_t> values{ 3, 85, 217389, -8604, -5, -7, -893, -993, -1 };
+	for (size_t x = 0; x < values.size(); x++)
+	{
+		test.setGPReg("r1", values[x]);
+		test.addInstr(instrName + "s3 = r1");
+		test.expectRegisterValue("s3", values[x]);
+	}
+	test.close();
+}
+
+void makeBranchDelayTest(std::string instrName, int32_t delay)
+{
+	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
+	std::vector<int32_t> values{ 0, 3, 17 };
+	for (int32_t x = 0; x < values.size(); x++)
+	{
+		for (size_t y = 0; y < delay; y++)
+		{
+			test.setGPReg("r" + std::to_string(y + 1), x + 1);
+		}
+		test.setGPReg("r" + std::to_string(delay + 1), x + 1);
+
+		test.addInstr(instrName + " x" + std::to_string(x));
+
+		for (size_t y = 0; y < delay; y++)
+		{
+			test.setGPReg("r" + std::to_string(y + 1), y + 2 + x);
+		}
+		test.setGPReg("r" + std::to_string(delay + 1), delay + 2 + x);
+
+		for (size_t y = 0; y < values[x]; y++)
+		{
+			test.addInstr("nop");
+		}
+
+		for (int32_t y = 0; y < delay; y++)
+		{
+			test.expectRegisterValue("r" + std::to_string(y + 1), y + 2 + x);
+		}
+		test.expectRegisterValue("r" + std::to_string(delay + 1), x + 1);
+
+		test.addInstr("x" + std::to_string(x) + ": nop");
+
+	}
+	test.close();
+}
+
+void makeBranchNoDelayTest(std::string instrName)
+{
+	int delay = 5;
+	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
+	std::vector<int32_t> values{ 0, 3, 17 };
+	for (int32_t x = 0; x < values.size(); x++)
+	{
+		for (size_t y = 0; y < delay; y++)
+		{
+			test.setGPReg("r" + std::to_string(y + 1), x + 1);
+		}
+		test.setGPReg("r" + std::to_string(delay + 1), x + 1);
+
+		test.addInstr(instrName + " x" + std::to_string(x));
+
+		for (size_t y = 0; y < delay; y++)
+		{
+			test.setGPReg("r" + std::to_string(y + 1), y + 2 + x);
+		}
+		test.setGPReg("r" + std::to_string(delay + 1), delay + 2 + x);
+
+		for (size_t y = 0; y < values[x]; y++)
+		{
+			test.addInstr("nop");
+		}
+
+		for (int32_t y = 0; y < delay; y++)
+		{
+			test.expectRegisterValue("r" + std::to_string(y + 1), x + 1);
+		}
+		test.expectRegisterValue("r" + std::to_string(delay + 1), x + 1);
+
+		test.addInstr("x" + std::to_string(x) + ": nop");
+
+	}
+	test.close();
+}
 
 void makeFPUrTest(std::string instrName, std::function<float(float, float)> op)
 {
@@ -340,10 +563,89 @@ int main(int argc, char const *argv[])
 	TESTS_DIR_ASM = argv[1];
 	TESTS_DIR_EXPECTED = argv[2];
 
-	std::cout << TESTS_DIR_ASM << std::endl;
-	std::cout << TESTS_DIR_EXPECTED << std::endl;
-
 	std::cout << "Generating tests..." << std::endl;
+
+	// ALUr
+	makeALUrTest("add", std::plus<int32_t>());
+	makeALUrTest("sub", std::minus<int32_t>());
+	makeALUrTest("xor", std::bit_xor<int32_t>());
+	makeALUrTest("sl", [](int32_t a, int32_t b) { return a << (b & 0xf); });
+	makeALUrTest("sr", [](int32_t a, int32_t b) { return ((uint32_t)a) >> (b & 0xf); });
+	makeALUrTest("sra", [](int32_t a, int32_t b) { return a >> (b & 0xf); });
+	makeALUrTest("or", std::bit_or<int32_t>());
+	makeALUrTest("and", std::bit_and<int32_t>());
+	makeALUrTest("nor", [](int32_t a, int32_t b) { return ~(a | b); });
+	makeALUrTest("shadd", [](int32_t a, int32_t b) { return (a << 1) + b; });
+	makeALUrTest("shadd2", [](int32_t a, int32_t b) { return (a << 2) + b; });
+
+	// ALUi
+	makeALUiTest("addi", std::plus<int32_t>());
+	makeALUiTest("subi", std::minus<int32_t>());
+	makeALUiTest("xori", std::bit_xor<int32_t>());
+	makeALUiTest("sli", [](int32_t a, int32_t b) { return a << (b & 0xf); });
+	makeALUiTest("sri", [](int32_t a, int32_t b) { return ((uint32_t)a) >> (b & 0xf); });
+	makeALUiTest("srai", [](int32_t a, int32_t b) { return a >> (b & 0xf); });
+	makeALUiTest("ori", std::bit_or<int32_t>());
+	makeALUiTest("andi", std::bit_and<int32_t>());
+	makeALUiTest("nori", [](int32_t a, int32_t b) { return ~(a | b); });
+	makeALUiTest("shaddi", [](int32_t a, int32_t b) { return (a << 1) + b; });
+	makeALUiTest("shadd2i", [](int32_t a, int32_t b) { return (a << 2) + b; });
+
+	// ALUl
+	makeALUiTest("addl", std::plus<int32_t>());
+	makeALUiTest("subl", std::minus<int32_t>());
+	makeALUiTest("xorl", std::bit_xor<int32_t>());
+	makeALUiTest("sll", [](int32_t a, int32_t b) { return a << (b & 0xf); });
+	makeALUiTest("srl", [](int32_t a, int32_t b) { return ((uint32_t)a) >> (b & 0xf); });
+	makeALUiTest("sral", [](int32_t a, int32_t b) { return a >> (b & 0xf); });
+	makeALUiTest("orl", std::bit_or<int32_t>());
+	makeALUiTest("andl", std::bit_and<int32_t>());
+	makeALUiTest("norl", [](int32_t a, int32_t b) { return ~(a | b); });
+	makeALUiTest("shaddl", [](int32_t a, int32_t b) { return (a << 1) + b; });
+	makeALUiTest("shadd2l", [](int32_t a, int32_t b) { return (a << 2) + b; });
+
+	// ALUm
+	makeALUmTest("mul" , [](int32_t a, int32_t b) { return (int64_t)a * (int64_t)b; }, [](int32_t a, int32_t b) { return ((int64_t)a * (int64_t)b) >> 32; });
+	makeALUmTest("mulu", [](int32_t a, int32_t b) { return (uint64_t)a * (uint64_t)b; }, [](int32_t a, int32_t b) { return ((uint64_t)a * (uint64_t)b) >> 32; });
+
+	// ALUc
+	makeALUcTest("cmpeq", [](int32_t a, int32_t b) { return a == b; });
+	makeALUcTest("cmpneq", [](int32_t a, int32_t b) { return a != b; });
+	makeALUcTest("cmplt", [](int32_t a, int32_t b) { return a < b; });
+	makeALUcTest("cmple", [](int32_t a, int32_t b) { return a <= b; });
+	makeALUcTest("cmpult", [](int32_t a, int32_t b) { return (uint32_t)a < (uint32_t)b; });
+	makeALUcTest("cmpule", [](int32_t a, int32_t b) { return (uint32_t)a <= (uint32_t)b; });
+	makeALUcTest("btest", [](int32_t a, int32_t b) { return (a & (1 << b)) != 0; });
+
+	// ALUci
+	makeALUcTest("cmpieq", [](int32_t a, int32_t b) { return a == b; });
+	makeALUcTest("cmpineq", [](int32_t a, int32_t b) { return a != b; });
+	makeALUcTest("cmpilt", [](int32_t a, int32_t b) { return a < b; });
+	makeALUcTest("cmpile", [](int32_t a, int32_t b) { return a <= b; });
+	makeALUcTest("cmpiult", [](int32_t a, int32_t b) { return (uint32_t)a < (uint32_t)b; });
+	makeALUcTest("cmpiule", [](int32_t a, int32_t b) { return (uint32_t)a <= (uint32_t)b; });
+	makeALUcTest("btesti", [](int32_t a, int32_t b) { return (a & (1 << b)) != 0; });
+
+	// ALUp
+	makeALUpTest("por" , [](bool a, bool b) { return a || b; });
+	makeALUpTest("pand", [](bool a, bool b) { return a && b; });
+	makeALUpTest("pxor", [](bool a, bool b) { return a != b; });
+
+	// ALUb
+	makeALUbTest("bcopy", [](int32_t a, int32_t b, bool pred) { return (a & ~(1 << b)) | (pred << b); });
+
+	// SPCt and SPCf
+	makeSPCtfTest("SPCt");
+
+	// CFLi Delayed
+	makeBranchDelayTest("call", 3);
+	makeBranchDelayTest("br", 2);
+	makeBranchDelayTest("brcf", 3);
+
+	// CFLi Non delayed
+	makeBranchNoDelayTest("callnd");
+	makeBranchNoDelayTest("brnd");
+	makeBranchNoDelayTest("brcfnd");
 
 	// FPUr tests
 	makeFPUrTest("fadds", std::plus<float>());
