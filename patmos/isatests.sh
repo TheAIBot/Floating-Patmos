@@ -1,17 +1,18 @@
 #!/bin/bash
 
-ISA_GEN_DIR=$(pwd)/asm-tests/ISATestsGen/ISATestsGen
-ISA_SIM_DIR=$(pwd)/asm-tests/ISASim/ISASim
+TESTS_DIR=$(pwd)/asm-tests
+ISA_GEN_DIR=$TESTS_DIR/ISATestsGen/ISATestsGen
+ISA_SIM_DIR=$TESTS_DIR/ISASim/ISASim
 PAASM_BUILD_DIR=$(pwd)/simulator/build
 PAASM_EXE_DIR=$PAASM_BUILD_DIR/src
 EMU_EXE_DIR=$(pwd)/hardware/build
 
-TESTS_ASM_DIR=$(pwd)/asm-tests/tests/asm
-TESTS_BIN_DIR=$(pwd)/asm-tests/tests/bin
-TESTS_EXPECTED_DIR=$(pwd)/asm-tests/tests/expected
-TESTS_EMU_ACTUAL_DIR=$(pwd)/asm-tests/tests/emu-actual
-TESTS_SIM_ACTUAL_DIR=$(pwd)/asm-tests/tests/isa-actual
-TESTS_HW_ACTUAL_DIR=$(pwd)/asm-tests/tests/hw-actual
+TESTS_ASM_DIR=$TESTS_DIR/tests/asm
+TESTS_BIN_DIR=$TESTS_DIR/tests/bin
+TESTS_EXPECTED_DIR=$TESTS_DIR/tests/expected
+TESTS_EMU_ACTUAL_DIR=$TESTS_DIR/tests/emu-actual
+TESTS_SIM_ACTUAL_DIR=$TESTS_DIR/tests/isa-actual
+TESTS_HW_ACTUAL_DIR=$TESTS_DIR/tests/hw-actual
 
 LOG_FILE=$(pwd)/testlog.log
 
@@ -32,12 +33,23 @@ mkdir -p $TESTS_HW_ACTUAL_DIR
 #generate tests
 $ISA_GEN_DIR/ISATestsGen $TESTS_ASM_DIR $TESTS_EXPECTED_DIR || exit 1
 
+echo -n "Compiling emulator "
+cp $TESTS_DIR/uartForTests.s $(pwd)/asm/uartForTests.s
+if make emulator BOOTAPP=uartForTests;# > $LOG_FILE 2>&1 ; 
+then
+    echo "Done"
+else
+    echo "Error"
+    cat $LOG_FILE
+    exit 1
+fi
+
 tests_fail=0
 tests_succeed=0
 
 #compile asm to binary
 shopt -s nullglob
-for file in $(pwd)/asm-tests/tests/asm/*
+for file in $TESTS_ASM_DIR/*
 do
     tmpfilename=$(basename "$file" .s)
     #echo ""
@@ -77,26 +89,20 @@ do
     else
         tests_fail=$(($tests_fail+1))
         echo "Error"
-        echo "expected:"
-        xxd -b -c 4 $TESTS_EXPECTED_DIR/$tmpfilename.uart
-        echo "actual:"
-        xxd -b -c 4 $TESTS_SIM_ACTUAL_DIR/$tmpfilename.uart
-        echo "diff:"
-        cmp -l $TESTS_EXPECTED_DIR/$tmpfilename.uart $TESTS_SIM_ACTUAL_DIR/$tmpfilename.uart
+        #echo "expected:"
+        #xxd -b -c 4 $TESTS_EXPECTED_DIR/$tmpfilename.uart
+        #echo "actual:"
+        #xxd -b -c 4 $TESTS_SIM_ACTUAL_DIR/$tmpfilename.uart
+        #echo "diff:"
+        #cmp -l $TESTS_EXPECTED_DIR/$tmpfilename.uart $TESTS_SIM_ACTUAL_DIR/$tmpfilename.uart
         continue
     fi
     
     cp $file $(pwd)/asm/$tmpfilename.s || exit 1
-    #$PAASM_EXE_DIR/paasm  $(BUILDDIR)/$*.bin
-	#touch $(BUILDDIR)/$*.dat
-    if make emulator BOOTAPP=$tmpfilename > $LOG_FILE 2>&1 ; 
-    then
-        echo -n "-"
-    else
-        echo "Compile emulator error"
-        cat $LOG_FILE
-        tests_fail=$(($tests_fail+1))
-    fi
+    make asm BOOTAPP=$tmpfilename > /dev/null 2>&1
+    #$PAASM_EXE_DIR/paasm $file $(pwd)/tmp/$tmpfilename.bin > /dev/null 2>&1
+	#touch $(pwd)/tmp/$tmpfilename.dat
+
     
     
     #pushd hardware
@@ -112,7 +118,7 @@ do
     #    continue
     #fi
     
-    $EMU_EXE_DIR/emulator -r -i -l 1000000 -O $TESTS_EMU_ACTUAL_DIR/$tmpfilename.uart > /dev/null
+    $EMU_EXE_DIR/emulator -i -l 1000000 -O $TESTS_EMU_ACTUAL_DIR/$tmpfilename.uart -b $(pwd)/tmp/$tmpfilename.bin > /dev/null
     echo -n "-"
     
     if cmp -s $TESTS_EXPECTED_DIR/$tmpfilename.uart $TESTS_EMU_ACTUAL_DIR/$tmpfilename.uart;
@@ -122,12 +128,12 @@ do
     else
         tests_fail=$(($tests_fail+1))
         echo "Error"
-        echo "expected:"
-        xxd -b -c 4 $TESTS_EXPECTED_DIR/$tmpfilename.uart
-        echo "actual:"
-        xxd -b -c 4 $TESTS_EMU_ACTUAL_DIR/$tmpfilename.uart
-        echo "diff:"
-        cmp -l $TESTS_EXPECTED_DIR/$tmpfilename.uart $TESTS_EMU_ACTUAL_DIR/$tmpfilename.uart
+        #echo "expected:"
+        #xxd -b -c 4 $TESTS_EXPECTED_DIR/$tmpfilename.uart
+        #echo "actual:"
+        #xxd -b -c 4 $TESTS_EMU_ACTUAL_DIR/$tmpfilename.uart
+        #echo "diff:"
+        #cmp -l $TESTS_EXPECTED_DIR/$tmpfilename.uart $TESTS_EMU_ACTUAL_DIR/$tmpfilename.uart
         continue
     fi
 done

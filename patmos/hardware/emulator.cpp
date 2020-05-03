@@ -40,6 +40,7 @@
 #include <sys/poll.h>
 #include <gelf.h>
 #include <libelf.h>
+#include <string>
 
 #include "Patmos.h"
 #include "emulator_config.h"
@@ -500,7 +501,50 @@ static val_t readelf(istream &is, Patmos_t *c)
   return entry;
 }
 
+// Read an elf executable image into the on-chip memories
+static val_t readbin(istream &is, Patmos_t *c)
+{
+  vector<uint32_t> binbuf;
+  binbuf.reserve(1 << 18);
+  while (is.good())
+  {
+    uint32_t instr = 0;
+
+    // read into buffer
+    is.read((char*)&instr, sizeof(uint32_t));
+
+    // check how much was read
+    std::streamsize count = is.gcount();
+    if (count != sizeof(uint32_t) && count != 0)
+    {
+      throw std::runtime_error("The binary file was not a multiple of 4.");
+    }
+    else if (count == 0)
+    {
+      break;
+    }
+
+    assert(binbuf.size() < (1 << 18));
+
+    instr = __builtin_bswap32(instr);
+    //std::cout << instr << std::endl;
+    binbuf.push_back(instr);
+  }
+
+  write_extmem((131076 >> 2) - 3, 1000);
+  write_extmem((131076 >> 2) - 2, 1000);
+  write_extmem((131076 >> 2) - 1, 1000);
+  write_extmem((131076 >> 2) - 0, 1000);
+  for (size_t i = 0; i < binbuf.size(); i++)
+  {
+    write_extmem((131076 >> 2) + i + 1, binbuf[i]);
+  }
+
+  return 131076;
+}
+
 static void init_icache(Patmos_t *c, val_t entry) {
+  std::cout << "entry: " << entry << std::endl;
   if (entry != 0) {
     if (entry >= 0x20000) {
       #ifdef ICACHE_METHOD
@@ -767,8 +811,11 @@ int main (int argc, char* argv[]) {
 
   program_name = argv[0];
 
+  bool hasBinFile = false;
+  std::string binPath;
+
   // Parse command line arguments
-  while ((opt = getopt(argc, argv, "e:hikl:nprvI:O:")) != -1) {
+  while ((opt = getopt(argc, argv, "e:hikl:nprvI:O:b:")) != -1) {
     switch (opt) {
     #ifdef IO_ETHMAC
     case 'e':
@@ -819,6 +866,13 @@ int main (int argc, char* argv[]) {
       }
       break;
     #endif /* IO_UART */
+    case 'b':
+      if (strcmp(optarg, "-") == 0) {
+      } else {
+        hasBinFile = true;
+        binPath = optarg;
+      }
+      break;
     case 'h':
       usage(cout, argv[0]);
       help(cout);
@@ -843,12 +897,24 @@ int main (int argc, char* argv[]) {
 
   // Parse ELF file, if present
   val_t entry = 0;
-  if (optind < argc) {
+  if (hasBinFile)
+  {
+    std::cout << binPath << std::endl;
+    ifstream *fs = new ifstream(binPath);
+    if (!fs->good()) {
+      cerr << argv[0] << ": error: Cannot open bin file " << optarg << endl;
+      exit(EXIT_FAILURE);
+    }
+    entry = readbin(*fs, c);
+    /* code */
+  }
+  else if (optind < argc) {
     ifstream *fs = new ifstream(argv[optind]);
     if (!fs->good()) {
       cerr << argv[0] << ": error: Cannot open elf file " << argv[optind] << endl;
       exit(EXIT_FAILURE);
     }
+    //readbin(*fs, c);
     entry = readelf(*fs, c);
   }
 
