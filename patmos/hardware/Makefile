@@ -18,7 +18,7 @@ SBT= sbt
 
 # C++ build flags
 CXX=g++
-CXXFLAGS=-O1
+CXXFLAGS=-O2
 
 # Quick fix for Mac OS X
 # How are include paths handled these days in *nix? CMake?

@@ -411,13 +411,13 @@ private:
 				setGPR(rd, aluOp1 ^ aluOp2);
 				break;
 			case 0b0011: // sl
-				setGPR(rd, aluOp1 << (aluOp2 & 0b1111));
+				setGPR(rd, aluOp1 << (aluOp2 & 0x1f));
 				break;
 			case 0b0100: // sr
-				setGPR(rd, aluOp1 >> (aluOp2 & 0b1111));
+				setGPR(rd, aluOp1 >> (aluOp2 & 0x1f));
 				break;
 			case 0b0101: // sra
-				setGPR(rd, ((int32_t)aluOp1) >> (aluOp2 & 0b1111));
+				setGPR(rd, ((int32_t)aluOp1) >> (aluOp2 & 0x1f));
 				break;
 			case 0b0110: // or
 				setGPR(rd, aluOp1 | aluOp2);
@@ -444,16 +444,52 @@ private:
 			{
 			case 0b0000: // mul
 			{
-				int64_t res = (int64_t)aluOp1 * (int64_t)aluOp2;
-				setSPR(2, res);
-				setSPR(3, res >> 32);
+				int32_t op1H = ((int32_t)aluOp1) >> 16;
+				int32_t op2H = ((int32_t)aluOp2) >> 16;
+				int32_t op1L = aluOp1 & 0xffff;
+				int32_t op2L = aluOp2 & 0xffff;
+
+				uint32_t mulLL = op1L * op2L;
+				uint32_t mulLH = op1L * op2H;
+				uint32_t mulHL = op1H * op2L;
+				uint32_t mulHH = op1H * op2H;
+
+				int64_t catHHLL = (((uint64_t)mulHH) << 32) | ((uint64_t)mulLL);
+				int64_t catHL = (int64_t)(int32_t)mulHL << 16;
+				int64_t catLH = (int64_t)(int32_t)mulLH << 16;
+
+				uint64_t res = catHHLL + catHL + catLH;
+
+				int32_t resL = res;
+				int32_t resH = res >> 32;
+
+				setSPR(2, resL);
+				setSPR(3, resH);
 				break;
 			}
 			case 0b0001: // mulu
 			{
-				uint64_t res = (uint64_t)aluOp1 * (uint64_t)aluOp2;
-				setSPR(2, res);
-				setSPR(3, res >> 32);
+    			int32_t op1H = ((uint32_t)aluOp1) >> 16;
+				int32_t op2H = ((uint32_t)aluOp2) >> 16;
+				int32_t op1L = aluOp1 & 0xffff;
+				int32_t op2L = aluOp2 & 0xffff;
+
+				uint32_t mulLL = op1L * op2L;
+				uint32_t mulLH = op1L * op2H;
+				uint32_t mulHL = op1H * op2L;
+				uint32_t mulHH = op1H * op2H;
+
+				int64_t catHHLL = (((uint64_t)mulHH) << 32) | ((uint64_t)mulLL);
+				int64_t catHL = (int64_t)(uint32_t)mulHL << 16;
+				int64_t catLH = (int64_t)(uint32_t)mulLH << 16;
+
+				uint64_t res = catHHLL + catHL + catLH;
+
+				uint32_t resL = res;
+				uint32_t resH = res >> 32;
+
+				setSPR(2, resL);
+				setSPR(3, resH);
 				break;
 			}
 			default:

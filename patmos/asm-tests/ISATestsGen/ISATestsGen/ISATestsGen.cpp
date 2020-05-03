@@ -191,7 +191,7 @@ void makeALUlTest(std::string instrName, std::function<int32_t(int32_t, int32_t)
 void makeALUmTest(std::string instrName, std::function<int32_t(uint32_t, uint32_t)> opL, std::function<int32_t(uint32_t, uint32_t)> opH)
 {
 	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
-	std::vector<int32_t> values{ 0, 1, 3, -5, 27893 };
+	std::vector<int32_t> values{ 3, -5, 2037828393 };
 	for (size_t x = 0; x < values.size(); x++)
 	{
 		for (size_t y = 0; y < values.size(); y++)
@@ -199,6 +199,9 @@ void makeALUmTest(std::string instrName, std::function<int32_t(uint32_t, uint32_
 			test.setGPReg("r1", values[x]);
 			test.setGPReg("r2", values[y]);
 			test.addInstr(instrName + " r1, r2");
+			test.addInstr("nop");
+			test.addInstr("nop");
+			test.addInstr("nop");
 			test.expectRegisterValue("sl", opL(values[x], values[y]));
 			test.expectRegisterValue("sh", opH(values[x], values[y]));
 		}
@@ -559,6 +562,62 @@ void makeFPUcTest(std::string instrName, std::function<bool(float, float)> op)
 	test.close();
 }
 
+struct mulRes
+{
+	uint32_t Low;
+	uint32_t High;
+};
+
+mulRes SignMul(uint32_t a, uint32_t b)
+{
+	int32_t op1H = ((int32_t)a) >> 16;
+    int32_t op2H = ((int32_t)b) >> 16;
+    int32_t op1L = a & 0xffff;
+    int32_t op2L = b & 0xffff;
+
+    uint32_t mulLL = op1L * op2L;
+    uint32_t mulLH = op1L * op2H;
+    uint32_t mulHL = op1H * op2L;
+    uint32_t mulHH = op1H * op2H;
+
+    int64_t catHHLL = (((uint64_t)mulHH) << 32) | ((uint64_t)mulLL);
+    int64_t catHL = (int64_t)(int32_t)mulHL << 16;
+    int64_t catLH = (int64_t)(int32_t)mulLH << 16;
+
+    uint64_t res = catHHLL + catHL + catLH;
+
+	mulRes mRes;
+	mRes.Low = res;
+	mRes.High = res >> 32;
+
+	return mRes;
+}
+
+mulRes UnsignMul(uint32_t a, uint32_t b)
+{
+	int32_t op1H = ((uint32_t)a) >> 16;
+    int32_t op2H = ((uint32_t)b) >> 16;
+    int32_t op1L = a & 0xffff;
+    int32_t op2L = b & 0xffff;
+
+    uint32_t mulLL = op1L * op2L;
+    uint32_t mulLH = op1L * op2H;
+    uint32_t mulHL = op1H * op2L;
+    uint32_t mulHH = op1H * op2H;
+
+    int64_t catHHLL = (((uint64_t)mulHH) << 32) | ((uint64_t)mulLL);
+    int64_t catHL = (int64_t)(uint32_t)mulHL << 16;
+    int64_t catLH = (int64_t)(uint32_t)mulLH << 16;
+
+    uint64_t res = catHHLL + catHL + catLH;
+
+	mulRes mRes;
+	mRes.Low = res;
+	mRes.High = res >> 32;
+
+	return mRes;
+}
+
 int main(int argc, char const *argv[])
 {
 	if (argc != 3)
@@ -576,9 +635,9 @@ int main(int argc, char const *argv[])
 	makeALUrTest("add", std::plus<int32_t>());
 	makeALUrTest("sub", std::minus<int32_t>());
 	makeALUrTest("xor", std::bit_xor<int32_t>());
-	makeALUrTest("sl", [](int32_t a, int32_t b) { return a << (b & 0xf); });
-	makeALUrTest("sr", [](int32_t a, int32_t b) { return ((uint32_t)a) >> (b & 0xf); });
-	makeALUrTest("sra", [](int32_t a, int32_t b) { return a >> (b & 0xf); });
+	makeALUrTest("sl", [](int32_t a, int32_t b) { return a << (b & 0x1f); });
+	makeALUrTest("sr", [](int32_t a, int32_t b) { return ((uint32_t)a) >> (b & 0x1f); });
+	makeALUrTest("sra", [](int32_t a, int32_t b) { return a >> (b & 0x1f); });
 	makeALUrTest("or", std::bit_or<int32_t>());
 	makeALUrTest("and", std::bit_and<int32_t>());
 	makeALUrTest("nor", [](int32_t a, int32_t b) { return ~(a | b); });
@@ -589,9 +648,9 @@ int main(int argc, char const *argv[])
 	makeALUiTest("addi", std::plus<int32_t>());
 	makeALUiTest("subi", std::minus<int32_t>());
 	makeALUiTest("xori", std::bit_xor<int32_t>());
-	makeALUiTest("sli", [](int32_t a, int32_t b) { return a << (b & 0xf); });
-	makeALUiTest("sri", [](int32_t a, int32_t b) { return ((uint32_t)a) >> (b & 0xf); });
-	makeALUiTest("srai", [](int32_t a, int32_t b) { return a >> (b & 0xf); });
+	makeALUiTest("sli", [](int32_t a, int32_t b) { return a << (b & 0x1f); });
+	makeALUiTest("sri", [](int32_t a, int32_t b) { return ((uint32_t)a) >> (b & 0x1f); });
+	makeALUiTest("srai", [](int32_t a, int32_t b) { return a >> (b & 0x1f); });
 	makeALUiTest("ori", std::bit_or<int32_t>());
 	makeALUiTest("andi", std::bit_and<int32_t>());
 	//these don't actually exist even though the book say they do
@@ -603,9 +662,9 @@ int main(int argc, char const *argv[])
 	makeALUiTest("addl", std::plus<int32_t>());
 	makeALUiTest("subl", std::minus<int32_t>());
 	makeALUiTest("xorl", std::bit_xor<int32_t>());
-	makeALUiTest("sll", [](int32_t a, int32_t b) { return a << (b & 0xf); });
-	makeALUiTest("srl", [](int32_t a, int32_t b) { return ((uint32_t)a) >> (b & 0xf); });
-	makeALUiTest("sral", [](int32_t a, int32_t b) { return a >> (b & 0xf); });
+	makeALUiTest("sll", [](int32_t a, int32_t b) { return a << (b & 0x1f); });
+	makeALUiTest("srl", [](int32_t a, int32_t b) { return ((uint32_t)a) >> (b & 0x1f); });
+	makeALUiTest("sral", [](int32_t a, int32_t b) { return a >> (b & 0x1f); });
 	makeALUiTest("orl", std::bit_or<int32_t>());
 	makeALUiTest("andl", std::bit_and<int32_t>());
 	makeALUiTest("norl", [](int32_t a, int32_t b) { return ~(a | b); });
@@ -613,8 +672,8 @@ int main(int argc, char const *argv[])
 	makeALUiTest("shadd2l", [](int32_t a, int32_t b) { return (a << 2) + b; });
 
 	// ALUm
-	makeALUmTest("mul" , [](uint32_t a, uint32_t b) { return (int64_t)a * (int64_t)b; }, [](uint32_t a, uint32_t b) { return (int64_t)(((int64_t)a * (int64_t)b)) >> 32; });
-	makeALUmTest("mulu", [](uint32_t a, uint32_t b) { return (uint64_t)a * (uint64_t)b; }, [](uint32_t a, uint32_t b) { return (uint64_t)(((uint64_t)a * (uint64_t)b)) >> 32; });
+	makeALUmTest("mul" , [](uint32_t a, uint32_t b) { return SignMul(a, b).Low; }, [](uint32_t a, uint32_t b) { return SignMul(a, b).High; });
+	makeALUmTest("mulu", [](uint32_t a, uint32_t b) { return UnsignMul(a, b).Low; }, [](uint32_t a, uint32_t b) { return UnsignMul(a, b).High; });
 
 	// ALUc
 	makeALUcTest("cmpeq", [](int32_t a, int32_t b) { return a == b; });

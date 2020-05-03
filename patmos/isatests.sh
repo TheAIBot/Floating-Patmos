@@ -13,6 +13,7 @@ TESTS_EXPECTED_DIR=$TESTS_DIR/tests/expected
 TESTS_EMU_ACTUAL_DIR=$TESTS_DIR/tests/emu-actual
 TESTS_SIM_ACTUAL_DIR=$TESTS_DIR/tests/isa-actual
 TESTS_HW_ACTUAL_DIR=$TESTS_DIR/tests/hw-actual
+TESTS_LOGS_DIR=$TESTS_DIR/tests/logs
 
 LOG_FILE=$(pwd)/testlog.log
 
@@ -29,6 +30,7 @@ mkdir -p $TESTS_EXPECTED_DIR
 mkdir -p $TESTS_EMU_ACTUAL_DIR
 mkdir -p $TESTS_SIM_ACTUAL_DIR
 mkdir -p $TESTS_HW_ACTUAL_DIR
+mkdir -p $TESTS_LOGS_DIR
 
 #generate tests
 $ISA_GEN_DIR/ISATestsGen $TESTS_ASM_DIR $TESTS_EXPECTED_DIR || exit 1
@@ -52,31 +54,30 @@ shopt -s nullglob
 for file in $TESTS_ASM_DIR/*
 do
     tmpfilename=$(basename "$file" .s)
+    logfile=$TESTS_LOGS_DIR/$(basename "$file" .s).log
     #echo ""
     #echo -n "Testing \t ${tmpfilename} ["
     printf  "Testing %8s [" $tmpfilename
     
     #compile test to bin
     #echo -n "Compiling assembly:        "
-    if $PAASM_EXE_DIR/paasm "$file" $TESTS_BIN_DIR/$tmpfilename.bin > $LOG_FILE 2>&1 ; 
+    if $PAASM_EXE_DIR/paasm "$file" $TESTS_BIN_DIR/$tmpfilename.bin > $logfile 2>&1 ; 
     then
         echo -n "-"
         touch $TESTS_BIN_DIR/$tmpfilename.dat
     else
-        echo "Compile error"
-        cat $LOG_FILE
+        echo " Failed to compile assembly"
         tests_fail=$(($tests_fail+1))
         continue
     fi
     
     #get isa sim output
     #echo -n "Running simulator:         "
-    if $ISA_SIM_DIR/ISASim $TESTS_BIN_DIR/$tmpfilename.bin $TESTS_SIM_ACTUAL_DIR/$tmpfilename.uart > $LOG_FILE 2>&1 ; 
+    if $ISA_SIM_DIR/ISASim $TESTS_BIN_DIR/$tmpfilename.bin $TESTS_SIM_ACTUAL_DIR/$tmpfilename.uart >> $logfile 2>&1 ; 
     then
         echo -n "-"
     else
-        echo "Simulation error"
-        cat $LOG_FILE
+        echo " Failed to simulate binary"
         tests_fail=$(($tests_fail+1))
         continue
     fi
@@ -88,37 +89,18 @@ do
         echo -n "-"
     else
         tests_fail=$(($tests_fail+1))
-        echo "Error"
-        #echo "expected:"
-        #xxd -b -c 4 $TESTS_EXPECTED_DIR/$tmpfilename.uart
-        #echo "actual:"
-        #xxd -b -c 4 $TESTS_SIM_ACTUAL_DIR/$tmpfilename.uart
-        #echo "diff:"
-        #cmp -l $TESTS_EXPECTED_DIR/$tmpfilename.uart $TESTS_SIM_ACTUAL_DIR/$tmpfilename.uart
+        echo " Simulator gave an incorrect result"
+        
+        echo "expected:" >> $logfile
+        xxd -b -c 4 $TESTS_EXPECTED_DIR/$tmpfilename.uart >> $logfile 2>&1
+        echo "actual:" >> $logfile
+        xxd -b -c 4 $TESTS_SIM_ACTUAL_DIR/$tmpfilename.uart >> $logfile 2>&1
+        echo "diff:" >> $logfile
+        cmp -l $TESTS_EXPECTED_DIR/$tmpfilename.uart $TESTS_SIM_ACTUAL_DIR/$tmpfilename.uart >> $logfile 2>&1
         continue
     fi
     
-    cp $file $(pwd)/asm/$tmpfilename.s || exit 1
-    make asm BOOTAPP=$tmpfilename > /dev/null 2>&1
-    #$PAASM_EXE_DIR/paasm $file $(pwd)/tmp/$tmpfilename.bin > /dev/null 2>&1
-	#touch $(pwd)/tmp/$tmpfilename.dat
-
-    
-    
-    #pushd hardware
-    #if make emulator BOOTBIN=$TESTS_BIN_DIR/$tmpfilename.bin > $LOG_FILE 2>&1 ; 
-    #then
-    #    popd
-    #    echo -n "-"
-    #else
-    #    popd
-    #    echo "Compile emulator error"
-    #    cat $LOG_FILE
-    #    tests_fail=$(($tests_fail+1))
-    #    continue
-    #fi
-    
-    $EMU_EXE_DIR/emulator -i -l 1000000 -O $TESTS_EMU_ACTUAL_DIR/$tmpfilename.uart -b $(pwd)/tmp/$tmpfilename.bin > /dev/null
+    $EMU_EXE_DIR/emulator -i -l 2000000 -O $TESTS_EMU_ACTUAL_DIR/$tmpfilename.uart -b $TESTS_BIN_DIR/$tmpfilename.bin > /dev/null
     echo -n "-"
     
     if cmp -s $TESTS_EXPECTED_DIR/$tmpfilename.uart $TESTS_EMU_ACTUAL_DIR/$tmpfilename.uart;
@@ -127,13 +109,14 @@ do
         echo "-]"
     else
         tests_fail=$(($tests_fail+1))
-        echo "Error"
-        #echo "expected:"
-        #xxd -b -c 4 $TESTS_EXPECTED_DIR/$tmpfilename.uart
-        #echo "actual:"
-        #xxd -b -c 4 $TESTS_EMU_ACTUAL_DIR/$tmpfilename.uart
-        #echo "diff:"
-        #cmp -l $TESTS_EXPECTED_DIR/$tmpfilename.uart $TESTS_EMU_ACTUAL_DIR/$tmpfilename.uart
+        echo " Emulator gave an incorrect result"
+        
+        echo "expected:" >> $logfile
+        xxd -b -c 4 $TESTS_EXPECTED_DIR/$tmpfilename.uart >> $logfile 2>&1
+        echo "actual:" >> $logfile
+        xxd -b -c 4 $TESTS_EMU_ACTUAL_DIR/$tmpfilename.uart >> $logfile 2>&1
+        echo "diff:" >> $logfile
+        cmp -l $TESTS_EXPECTED_DIR/$tmpfilename.uart $TESTS_EMU_ACTUAL_DIR/$tmpfilename.uart >> $logfile 2>&1
         continue
     fi
 done
