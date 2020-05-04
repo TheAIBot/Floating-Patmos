@@ -61,17 +61,17 @@ class AluOp() extends Bundle() {
 
 class FpuOp() extends Bundle() {
   val func = UInt(width = 4)
-  //val isTR = Bool()
-  //val isSR = Bool()
-  //val isCmp = Bool()
+  val isTR = Bool()
+  val isSR = Bool()
+  val isCmp = Bool()
   val isMTF = Bool()
   val isMFF = Bool()
 
   def defaults() = {
     func := UInt(0)
-    //isTR := Bool(false)
-    //isSR := Bool(false)
-    //isCmp := Bool(false)
+    isTR := Bool(false)
+    isSR := Bool(false)
+    isCmp := Bool(false)
     isMTF := Bool(false)
     isMFF := Bool(false)
   }

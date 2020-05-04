@@ -750,12 +750,12 @@ int main(int argc, char const *argv[])
 	makeFPCfTest("fmvsi", [](float a) { return reinterpret_cast<int32_t&>(a); });
 	makeFPCfTest("fclasss", classifyFloat);
 	makeClassifyTest("fclasss");
-    /*
+    
 	//FPUc tests
 	makeFPUcTest("feqs", [](float a, float b) { return a == b; });
 	makeFPUcTest("flts", [](float a, float b) { return a < b; });
 	makeFPUcTest("fles", [](float a, float b) { return a <= b; });
-	*/
+	
 
 	std::cout << "Tests generated." << std::endl;
 

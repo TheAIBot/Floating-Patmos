@@ -342,7 +342,7 @@ class Decode() extends Module {
 
   io.decex.fpuOp.func := func
   io.decex.isFloatSrc1 := decReg.isFloatSrc1
-  /*
+
   when(opcode === OPCODE_FPU) {
     switch(opc) {
       is(OPC_FPUR) {
@@ -351,6 +351,7 @@ class Decode() extends Module {
         decoded(0) := Bool(true)
       }
       is(OPC_FPUC) {
+        io.decex.fpuOp.isCmp := Bool(true)
         io.decex.wrRd(0) := Bool(true)
         io.decex.fpuOp.isCmp := Bool(true)
         decoded(0) := Bool(true)
@@ -368,10 +369,7 @@ class Decode() extends Module {
       }
     }
   }
-  */
 
-  //io.decex.fpuOp.isMTF := Bool(false)
-  //io.decex.fpuOp.isMFF := Bool(false)
   when(opcode === OPCODE_FPC) {
     switch(opc) {
       is(OPC_FPCT) {
