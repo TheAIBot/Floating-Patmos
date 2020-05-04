@@ -37,3 +37,4 @@ patmos/asm/*.s
 /**/_deps
 
 /**/.bloop
+/**/.metals/

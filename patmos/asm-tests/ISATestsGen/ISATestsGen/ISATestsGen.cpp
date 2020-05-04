@@ -10,6 +10,7 @@
 #include <charconv>
 #include <array>
 #include <vector>
+#include <cfenv>
 #include "ISATestsGen.h"
 
 std::string TESTS_DIR_ASM = "../tests/asm";
@@ -52,7 +53,9 @@ t2:		lwl     r27  = [r28 + 0]
 		nop
 		nop
         retnd
-start:  nop)" << '\n';
+start:  nop
+        nop
+        nop)" << '\n';
 	}
 
 	void addInstr(std::string instr)
@@ -62,14 +65,14 @@ start:  nop)" << '\n';
 
 	void setFloatReg(std::string reg, float value)
 	{
-		addInstr("fmvis " + reg + " = r0");
-		if (std::isnan(value) || std::isinf(value) || std::fpclassify(value) == FP_SUBNORMAL)
+		if (true || std::isnan(value) || std::isinf(value) || std::fpclassify(value) == FP_SUBNORMAL)
 		{
-			addInstr("addl r26 = r0, " + std::to_string(reinterpret_cast<uint32_t&>(value)));
-			addInstr("fmvis " + reg + " = r26");
+			addInstr("addl r23 = r0, " + std::to_string(reinterpret_cast<uint32_t&>(value)));
+			addInstr("fmvis " + reg + " = r23");
 		}
 		else
 		{
+            addInstr("fmvis " + reg + " = r0");
 			addInstr("faddsl " + reg + " = " + reg + ", " + std::to_string(value));
 		}
 	}
@@ -350,7 +353,7 @@ void makeBranchNoDelayTest(std::string instrName)
 void makeFPUrTest(std::string instrName, std::function<float(float, float)> op)
 {
 	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
-	float f1 = 0.0f;
+	float f1 = 17.0f;
 	float f2 = 1.0f;
 	float f3 = 3.27f;
 	float f4 = -5.78;
@@ -374,7 +377,7 @@ void makeFPUrTest(std::string instrName, std::function<float(float, float)> op)
 void makeFPUlTest(std::string instrName, std::function<float(float, float)> op)
 {
 	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
-	float f1 = 0.0f;
+	float f1 = 17.0f;
 	float f2 = 1.0f;
 	float f3 = 3.27f;
 	float f4 = -5.78;
@@ -398,7 +401,7 @@ void makeFPUlTest(std::string instrName, std::function<float(float, float)> op)
 void makeFPUrsTest(std::string instrName, std::function<float(float)> op)
 {
 	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
-	float f1 = 0.0f;
+	float f1 = 17.0f;
 	float f2 = 1.0f;
 	float f3 = 3.27f;
 	float f4 = -5.78;
@@ -424,7 +427,7 @@ void makeFPUrsTest(std::string instrName, std::function<float(float)> op)
 void makeFPCtTest(std::string instrName, std::function<float(int32_t)> op)
 {
 	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
-	int32_t r1 = 0;
+	int32_t r1 = 17;
 	int32_t r2 = 1;
 	int32_t r3 = 3;
 	int32_t r4 = -5;
@@ -450,21 +453,21 @@ void makeFPCtTest(std::string instrName, std::function<float(int32_t)> op)
 void makeFPCfTest(std::string instrName, std::function<int32_t(float)> op)
 {
 	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
-	float f1 = 0.0f;
+	float f1 = 17.0f;
 	float f2 = 1.0f;
 	float f3 = 3.27f;
 	float f4 = -5.78;
 	float f5 = 3.141592f;
-	test.setFloatReg("f1", f1);
-	test.setFloatReg("f2", f2);
-	test.setFloatReg("f3", f3);
-	test.setFloatReg("f4", f4);
-	test.setFloatReg("f5", f5);
-	test.addInstr(instrName + " r10 = f1");
-	test.addInstr(instrName + " r11 = f2");
-	test.addInstr(instrName + " r12 = f3");
-	test.addInstr(instrName + " r13 = f4");
-	test.addInstr(instrName + " r14 = f5");
+	test.setFloatReg("f10", f1);
+	test.setFloatReg("f11", f2);
+	test.setFloatReg("f12", f3);
+	test.setFloatReg("f13", f4);
+	test.setFloatReg("f14", f5);
+	test.addInstr(instrName + " r10 = f10");
+	test.addInstr(instrName + " r11 = f11");
+	test.addInstr(instrName + " r12 = f12");
+	test.addInstr(instrName + " r13 = f13");
+	test.addInstr(instrName + " r14 = f14");
 	test.expectRegisterValue("r10", op(f1));
 	test.expectRegisterValue("r11", op(f2));
 	test.expectRegisterValue("r12", op(f3));
@@ -539,7 +542,7 @@ void makeClassifyTest(std::string instrName)
 void makeFPUcTest(std::string instrName, std::function<bool(float, float)> op)
 {
 	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
-	float f1 = 0.0f;
+	float f1 = 17.0f;
 	float f2 = 1.0f;
 	float f3 = 3.27f;
 	float f4 = -5.78;
@@ -630,7 +633,11 @@ int main(int argc, char const *argv[])
 	TESTS_DIR_EXPECTED = argv[2];
 
 	std::cout << "Generating tests..." << std::endl;
-
+    
+    //#pragma STDC FENV_ACCESS ON
+    //std::fesetround(FE_TOWARDZERO);
+    
+    /*
 	// ALUr
 	makeALUrTest("add", std::plus<int32_t>());
 	makeALUrTest("sub", std::minus<int32_t>());
@@ -731,7 +738,7 @@ int main(int argc, char const *argv[])
 
 	// FPUrs tests
 	makeFPUrsTest("fsqrts", [](float a) { return std::sqrt(a); });
-
+    */
 	// FPCt tests
 	makeFPCtTest("fcvtis", [](int32_t a) { return static_cast<float>(a); });
 	makeFPCtTest("fcvtus", [](int32_t a) { return static_cast<float>(static_cast<uint32_t>(a)); });
@@ -743,11 +750,12 @@ int main(int argc, char const *argv[])
 	makeFPCfTest("fmvsi", [](float a) { return reinterpret_cast<int32_t&>(a); });
 	makeFPCfTest("fclasss", classifyFloat);
 	makeClassifyTest("fclasss");
-
+    /*
 	//FPUc tests
 	makeFPUcTest("feqs", [](float a, float b) { return a == b; });
 	makeFPUcTest("flts", [](float a, float b) { return a < b; });
 	makeFPUcTest("fles", [](float a, float b) { return a <= b; });
+	*/
 
 	std::cout << "Tests generated." << std::endl;
 

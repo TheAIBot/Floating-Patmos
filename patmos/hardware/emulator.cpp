@@ -754,8 +754,12 @@ static void print_state(Patmos_t *c) {
   *out << ((baseReg + c->Patmos_PatmosCore_fetch__pcReg.to_ulong()) * 4 - c->Patmos_PatmosCore_fetch__relBaseReg.to_ulong() * 4) << " - ";
   baseReg = c->Patmos_PatmosCore_icache_repl__callRetBaseReg.to_ulong();
 
-  for (unsigned i = 0; i < 32; i++) {
-    *out << c->Patmos_PatmosCore_decode_rf__rf.get(i).to_ulong() << " ";
+  for (unsigned i = 0; i < 64; i++) {
+    uint64_t value = c->Patmos_PatmosCore_decode_rf__rf.get(i).to_ulong();
+    string regName = i < 32 ? ("r" + std::to_string(i) + ": ") : ("f" + std::to_string(i - 32) + ": ");
+    if(value != 0) {
+      *out << regName << value << " ";
+    }
   }
 
   *out << endl;

@@ -38,6 +38,7 @@ class Memory() extends Module {
   val enable = (io.localInOut.S.Resp === OcpResp.DVA
                 || io.globalInOut.S.Resp === OcpResp.DVA
                 || !mayStallReg)
+  //enable := !(io.exmem.fpuStall && !io.exmem.fpuDone)
   io.ena_out := enable
 
   // Register from execution stage

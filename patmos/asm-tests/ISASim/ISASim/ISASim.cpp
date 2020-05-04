@@ -12,6 +12,7 @@
 #include <immintrin.h>
 #include <cmath>
 #include <memory>
+#include <cfenv>
 #include "ISASim.h"
 
 int32_t classifyFloat(float a)
@@ -947,6 +948,9 @@ int main(int argc, char const *argv[])
 
 	std::string binFilePath = argv[1];
 	std::string uartFilePath = argv[2];
+    
+    //#pragma STDC FENV_ACCESS ON
+    //std::fesetround(FE_TOWARDZERO);
 	
 
 	//std::string binFilePath = "/home/cake/t-crest/patmos/asm-tests/tests/bin/fadds.bin";

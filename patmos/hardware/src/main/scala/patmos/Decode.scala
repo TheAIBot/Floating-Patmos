@@ -341,6 +341,7 @@ class Decode() extends Module {
   }
 
   io.decex.fpuOp.func := func
+  io.decex.isFloatSrc1 := decReg.isFloatSrc1
   /*
   when(opcode === OPCODE_FPU) {
     switch(opc) {

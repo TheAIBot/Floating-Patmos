@@ -133,6 +133,9 @@ class DecEx() extends Bundle() {
   val memOp = new MemOp()
   val stackOp = UInt(width = SC_OP_BITS)
 
+  val isFloatSrc1 = Bool()
+
+
   // the register fields are very similar to RegFileRead
   // maybe join the structures
   val rsAddr = Vec.fill(2*PIPE_COUNT) { UInt(width = REG_BITS) }
