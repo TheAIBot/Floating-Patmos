@@ -124,10 +124,10 @@
     MK_INSTR(sbl , stt,  9)
     MK_INSTR(sbc , stt, 10)
     MK_INSTR(sbm , stt, 11)
-	MK_SINSTR(sss, stt, 12) // floating-point extension instruction
-    MK_INSTR(ssl , stt, 13) // floating-point extension instruction
-    MK_INSTR(ssc , stt, 14) // floating-point extension instruction
-    MK_INSTR(ssm , stt, 15) // floating-point extension instruction
+	MK_SINSTR(sss, stt, 20) // floating-point extension instruction
+    MK_INSTR(ssl , stt, 21) // floating-point extension instruction
+    MK_INSTR(ssc , stt, 22) // floating-point extension instruction
+    MK_INSTR(ssm , stt, 23) // floating-point extension instruction
 
     // STCi
     MK_INSTR(sres  , stci, 0)

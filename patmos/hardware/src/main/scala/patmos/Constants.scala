@@ -86,8 +86,11 @@ object Constants {
   // We might cut that down to what we actually really support (16 MB)
   val PC_SIZE = 30
 
-  val REG_BITS = 5
-  val REG_COUNT = 1 << REG_BITS
+  val GPR_COUNT = 32
+  val FPR_COUNT = 32
+  val FPR_OFFSET = GPR_COUNT
+  val REG_COUNT = GPR_COUNT + FPR_COUNT
+  val REG_BITS = log2Up(REG_COUNT)
 
   val PRED_BITS = 3
   val PRED_COUNT = 1 << PRED_BITS
@@ -99,6 +102,9 @@ object Constants {
 
   val BYTE_WIDTH = 8
   val BYTES_PER_WORD = DATA_WIDTH / BYTE_WIDTH
+
+  val FP_S_EXP_WIDTH = 8
+  val FP_S_FRAC_WIDTH = 23
 
   val OPCODE_ALUI = UInt("b00")
   val OPCODE_ALU = UInt("b01000")
@@ -122,6 +128,9 @@ object Constants {
 
   val OPCODE_ALUL = UInt("b11111")
 
+  val OPCODE_FPU = UInt("b01101")
+  val OPCODE_FPC = UInt("b01110")
+
   val OPC_ALUR  = UInt("b000")
   val OPC_ALUU  = UInt("b001")
   val OPC_ALUM  = UInt("b010")
@@ -133,41 +142,50 @@ object Constants {
   val OPC_MTS = UInt("b010")
   val OPC_MFS = UInt("b011")
 
-  val MSIZE_W = UInt("b000")
-  val MSIZE_H = UInt("b001")
-  val MSIZE_B = UInt("b010")
+  val OPC_FPUR  = UInt("b000")
+  val OPC_FPUC  = UInt("b001")
+  val OPC_FPUL  = UInt("b010")
+  val OPC_FPURS = UInt("b011")
+
+  val OPC_FPCT = UInt("b000")
+  val OPC_FPCF = UInt("b001")
+
+  val MSIZE_W  = UInt("b000")
+  val MSIZE_H  = UInt("b001")
+  val MSIZE_B  = UInt("b010")
   val MSIZE_HU = UInt("b011")
   val MSIZE_BU = UInt("b100")
+  val MSIZE_S  = UInt("b101")
 
   val MTYPE_S = UInt("b00")
   val MTYPE_L = UInt("b01")
   val MTYPE_C = UInt("b10")
   val MTYPE_M = UInt("b11")
 
-  val FUNC_ADD = UInt("b0000")
-  val FUNC_SUB = UInt("b0001")
-  val FUNC_XOR = UInt("b0010")
-  val FUNC_SL = UInt("b0011")
-  val FUNC_SR = UInt("b0100")
-  val FUNC_SRA = UInt("b0101")
-  val FUNC_OR = UInt("b0110")
-  val FUNC_AND = UInt("b0111")
-  val FUNC_NOR = UInt("b1011")
-  val FUNC_SHADD = UInt("b1100")
+  val FUNC_ADD    = UInt("b0000")
+  val FUNC_SUB    = UInt("b0001")
+  val FUNC_XOR    = UInt("b0010")
+  val FUNC_SL     = UInt("b0011")
+  val FUNC_SR     = UInt("b0100")
+  val FUNC_SRA    = UInt("b0101")
+  val FUNC_OR     = UInt("b0110")
+  val FUNC_AND    = UInt("b0111")
+  val FUNC_NOR    = UInt("b1011")
+  val FUNC_SHADD  = UInt("b1100")
   val FUNC_SHADD2 = UInt("b1101")
 
-  val MFUNC_MUL = UInt("b0000")
+  val MFUNC_MUL  = UInt("b0000")
   val MFUNC_MULU = UInt("b0001")
 
-  val CFUNC_EQ = UInt("b0000")
-  val CFUNC_NEQ = UInt("b0001")
-  val CFUNC_LT = UInt("b0010")
-  val CFUNC_LE = UInt("b0011")
-  val CFUNC_ULT = UInt("b0100")
-  val CFUNC_ULE = UInt("b0101")
+  val CFUNC_EQ    = UInt("b0000")
+  val CFUNC_NEQ   = UInt("b0001")
+  val CFUNC_LT    = UInt("b0010")
+  val CFUNC_LE    = UInt("b0011")
+  val CFUNC_ULT   = UInt("b0100")
+  val CFUNC_ULE   = UInt("b0101")
   val CFUNC_BTEST = UInt("b0110")
 
-  val PFUNC_OR = UInt("b00")
+  val PFUNC_OR  = UInt("b00")
   val PFUNC_AND = UInt("b01")
   val PFUNC_XOR = UInt("b10")
   val PFUNC_NOR = UInt("b11")
@@ -199,4 +217,27 @@ object Constants {
 
   val SC_OP_BITS = 3
   val sc_OP_NONE :: sc_OP_SET_ST :: sc_OP_SET_MT :: sc_OP_RES :: sc_OP_ENS :: sc_OP_FREE :: sc_OP_SPILL :: Nil = Enum(UInt(), 7)
+
+  val FP_FUNC_ADD    = UInt("b0000")
+  val FP_FUNC_SUB    = UInt("b0001")
+  val FP_FUNC_MUL    = UInt("b0010")
+  val FP_FUNC_DIV    = UInt("b0011")
+  val FP_FUNC_SGNJS  = UInt("b0100")
+  val FP_FUNC_SGNJNS = UInt("b0101")
+  val FP_FUNC_SGNJXS = UInt("b0110")
+
+  val FP_RSFUNC_SQRT = UInt("b0000")
+
+  val FP_FPCTFUNC_CVTIS = UInt("b0000")
+  val FP_FPCTFUNC_CVTUS = UInt("b0001")
+  val FP_FPCTFUNC_MVIS  = UInt("b0010")
+
+  val FP_FPCFFUNC_CVTSI  = UInt("b0000")
+  val FP_FPCFFUNC_CVTSU  = UInt("b0001")
+  val FP_FPCFFUNC_MVSI   = UInt("b0010")
+  val FP_FPCFFUNC_CLASS  = UInt("b0011")
+
+  val FP_CFUNC_EQ  = UInt("b0000")
+  val FP_CFUNC_LT  = UInt("b0001")
+  val FP_CFUNC_LE  = UInt("b0010")
 }

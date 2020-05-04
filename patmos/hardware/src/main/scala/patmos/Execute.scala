@@ -11,6 +11,8 @@ package patmos
 import Chisel._
 
 import Constants._
+import hardfloat._
+
 
 class Execute() extends Module {
   val io = IO(new ExecuteIO())
@@ -293,6 +295,60 @@ class Execute() extends Module {
     io.exmem.rd(i).data := Mux(exReg.aluOp(i).isMFS, mfsResult,
                                Mux(exReg.aluOp(i).isBCpy, bcpyResult,
                                    aluResult))
+  }
+
+  when(exReg.fpuOp.isMTF) {
+    io.exmem.rd(0).addr := exReg.rdAddr(0)
+    io.exmem.rd(0).valid := exReg.wrRd(0) && doExecute(0)
+
+    io.exmem.rd(0).data := op(0)
+    /*
+    val mvResult = Wire(UInt())
+    mvResult := UInt(0)
+    switch(exReg.fpuOp.func) {
+      is(FP_FPCTFUNC_CVTIS, FP_FPCTFUNC_CVTUS) {
+        val isSigned = exReg.fpuOp.func === FP_FPCTFUNC_CVTIS;
+        val intAsRawFloat = rawFloatFromIN(isSigned,op(0));
+        val asBinary32 = resizeRawFloat(FP_S_EXP_WIDTH, FP_S_FRAC_WIDTH, intAsRawFloat)
+
+        mvResult = Cat(UInt(asBinary32.sign), asBinary32.)
+      }
+      //is(FP_FPCTFUNC_CVTUS) {
+        
+      //}
+      is(FP_FPCTFUNC_MVIS) {
+        mvResult := op(0)
+      }
+    }
+    io.exmem.rd(0).data := mvResult
+    */
+    
+  }
+
+  when(exReg.fpuOp.isMFF) {
+    io.exmem.rd(0).addr := exReg.rdAddr(0)
+    io.exmem.rd(0).valid := exReg.wrRd(0) && doExecute(0)
+
+    io.exmem.rd(0).data := op(0)
+    /*
+    val mvResult = Wire(UInt())
+    mvResult := UInt(0)
+    switch(exReg.fpuOp.func) {
+      is(FP_FPCFFUNC_CVTSI) {
+
+      }
+      is(FP_FPCFFUNC_CVTSU) {
+        
+      }
+      is(FP_FPCFFUNC_MVSI) {
+        mvResult := exReg.rsData(0)
+      }
+      is(FP_FPCFFUNC_CLASS) {
+       
+      }
+    }
+    io.exmem.rd(0).data := mvResult
+    */
   }
 
   // load/store

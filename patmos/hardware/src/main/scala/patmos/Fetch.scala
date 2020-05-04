@@ -118,12 +118,28 @@ class Fetch(fileName : String) extends Module {
 
   val relPc = pcReg - relBaseReg
 
+  val opcodeA  = instr_a(26, 22)
+  val opcA     = instr_a(6, 4)
+  val sttType  = instr_a(21, 19)
+  val ldtType  = instr_a(11, 9)
+
+  val isFloatDst = (opcodeA === OPCODE_FPU && opcA =/= OPC_FPUC) || 
+                   (opcodeA === OPCODE_FPC && opcA === OPC_FPCT) || 
+                   (opcodeA === OPCODE_LDT && ldtType === MSIZE_S)
+  val isFloatSrc1 = opcodeA === OPCODE_FPU || 
+                   (opcodeA === OPCODE_FPC && opcA === OPC_FPCF)
+  val isFloatSrc2 = opcodeA === OPCODE_FPU || 
+                   (opcodeA === OPCODE_STT && sttType === MSIZE_S)
+
   io.fedec.pc := pcReg
   io.fedec.base := baseReg
   io.fedec.reloc := relocReg
   io.fedec.relPc := relPc
   io.fedec.instr_a := instr_a
   io.fedec.instr_b := instr_b
+  io.fedec.isFloatDst := isFloatDst
+  io.fedec.isFloatSrc1 := isFloatSrc1
+  io.fedec.isFloatSrc2 := isFloatSrc2
 
   io.feex.pc := Mux(b_valid, relPc + UInt(2), relPc + UInt(1))
 

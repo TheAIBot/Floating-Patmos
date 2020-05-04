@@ -100,7 +100,7 @@ do
         continue
     fi
     
-    $EMU_EXE_DIR/emulator -i -l 2000000 -O $TESTS_EMU_ACTUAL_DIR/$tmpfilename.uart -b $TESTS_BIN_DIR/$tmpfilename.bin > /dev/null
+    $EMU_EXE_DIR/emulator -i -l 2000000 -O $TESTS_EMU_ACTUAL_DIR/$tmpfilename.uart -b $TESTS_BIN_DIR/$tmpfilename.bin >> $logfile 2>&1
     echo -n "-"
     
     if cmp -s $TESTS_EXPECTED_DIR/$tmpfilename.uart $TESTS_EMU_ACTUAL_DIR/$tmpfilename.uart;

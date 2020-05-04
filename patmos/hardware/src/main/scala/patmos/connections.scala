@@ -21,6 +21,9 @@ class FeDec() extends Bundle() {
   val base = UInt(width = PC_SIZE)
   val reloc = UInt(width = ADDR_WIDTH)
   val relPc = UInt(width = PC_SIZE)
+  val isFloatDst = Bool()
+  val isFloatSrc1 = Bool()
+  val isFloatSrc2 = Bool()
 
   def flush() = {
     // flush only necessary parts of instruction
@@ -28,6 +31,9 @@ class FeDec() extends Bundle() {
     // instr_a(26, 25) := OPCODE_ALUI
     // instr_b(30, 27) := PRED_IFFALSE
     // instr_b(26, 25) := OPCODE_ALUI
+    isFloatDst := Bool(false)
+    isFloatSrc1 := Bool(false)
+    isFloatSrc2 := Bool(false)
     instr_a := UInt(0)
     instr_b := UInt(0)
   }
@@ -50,6 +56,24 @@ class AluOp() extends Bundle() {
     isBCpy := Bool(false)
     isMTS := Bool(false)
     isMFS := Bool(false)
+  }
+}
+
+class FpuOp() extends Bundle() {
+  val func = UInt(width = 4)
+  //val isTR = Bool()
+  //val isSR = Bool()
+  //val isCmp = Bool()
+  val isMTF = Bool()
+  val isMFF = Bool()
+
+  def defaults() = {
+    func := UInt(0)
+    //isTR := Bool(false)
+    //isSR := Bool(false)
+    //isCmp := Bool(false)
+    isMTF := Bool(false)
+    isMFF := Bool(false)
   }
 }
 
@@ -103,6 +127,7 @@ class DecEx() extends Bundle() {
   val relPc = UInt(width = PC_SIZE)
   val pred =  Vec.fill(PIPE_COUNT) { UInt(width = PRED_BITS+1) }
   val aluOp = Vec.fill(PIPE_COUNT) { new AluOp() }
+  val fpuOp = new FpuOp()
   val predOp = Vec.fill(PIPE_COUNT) { new PredOp() }
   val jmpOp = new JmpOp()
   val memOp = new MemOp()
@@ -140,6 +165,7 @@ class DecEx() extends Bundle() {
     relPc := UInt(0)
     pred := Vec.fill(PIPE_COUNT) { PRED_IFFALSE }
     aluOp.map(_.defaults())
+    fpuOp.map(_.defaults())
     predOp.map(_.defaults())
     jmpOp.defaults()
     memOp.defaults()

@@ -17,11 +17,11 @@ class Decode() extends Module {
   val rf = Module(new RegisterFile())
 
   // register file is connected with unregistered instruction word
-  rf.io.rfRead.rsAddr(0) := io.fedec.instr_a(16, 12)
-  rf.io.rfRead.rsAddr(1) := io.fedec.instr_a(11, 7)
+  rf.io.rfRead.rsAddr(0) := Cat(UInt(io.fedec.isFloatSrc1), io.fedec.instr_a(16, 12))
+  rf.io.rfRead.rsAddr(1) := Cat(UInt(io.fedec.isFloatSrc2), io.fedec.instr_a(11, 7))
   if (PIPE_COUNT > 1) {
-    rf.io.rfRead.rsAddr(2) := io.fedec.instr_b(16, 12)
-    rf.io.rfRead.rsAddr(3) := io.fedec.instr_b(11, 7)
+    rf.io.rfRead.rsAddr(2) := Cat(UInt(0), io.fedec.instr_b(16, 12))
+    rf.io.rfRead.rsAddr(3) := Cat(UInt(0), io.fedec.instr_b(11, 7))
   }
   rf.io.ena := io.ena
   // RF write from write back stage
@@ -41,11 +41,11 @@ class Decode() extends Module {
   io.decex.defaults()
 
   // forward RF addresses and data
-  io.decex.rsAddr(0) := decReg.instr_a(16, 12)
-  io.decex.rsAddr(1) := decReg.instr_a(11, 7)
+  io.decex.rsAddr(0) := Cat(UInt(decReg.isFloatSrc1), decReg.instr_a(16, 12))
+  io.decex.rsAddr(1) := Cat(UInt(decReg.isFloatSrc2), decReg.instr_a(11, 7))
   if (PIPE_COUNT > 1) {
-    io.decex.rsAddr(2) := decReg.instr_b(16, 12)
-    io.decex.rsAddr(3) := decReg.instr_b(11, 7)
+    io.decex.rsAddr(2) := Cat(UInt(0), decReg.instr_b(16, 12))
+    io.decex.rsAddr(3) := Cat(UInt(0), decReg.instr_b(11, 7))
   }
 
   io.decex.rsData(0) := rf.io.rfRead.rsData(0)
@@ -144,12 +144,13 @@ class Decode() extends Module {
     io.decex.pred(i) := instr(30, 27)
 
     // Default destination
-    io.decex.rdAddr(i) := instr(21, 17)
+    io.decex.rdAddr(i) := Cat(UInt(0), instr(21, 17))
   }
 
   // Decoding of additional operations for first pipeline
   val instr = decReg.instr_a
   val opcode = instr(26, 22)
+  val opc = instr(6, 4)
   val func = instr(3, 0)
 
   val ldsize = instr(11, 9)
@@ -176,7 +177,7 @@ class Decode() extends Module {
   isSTC := Bool(false)
 
   // Everything except calls uses the default
-  dest := instr(21, 17)
+  dest := Cat(UInt(decReg.isFloatDst), instr(21, 17))
 
   // ALU long immediate (Bit 31 is set as well)
   when(opcode === OPCODE_ALUL && instr(6, 4) === UInt(0)) {
@@ -284,7 +285,7 @@ class Decode() extends Module {
     io.decex.memOp.load := Bool(true)
     io.decex.wrRd(0) := Bool(true)
     switch(ldsize) {
-      is(MSIZE_W) {
+      is(MSIZE_W, MSIZE_S) {
         shamt := UInt(2)
       }
       is(MSIZE_H) {
@@ -318,7 +319,7 @@ class Decode() extends Module {
     isMem := Bool(true)
     io.decex.memOp.store := Bool(true)
     switch(stsize) {
-      is(MSIZE_W) {
+      is(MSIZE_W, MSIZE_S) {
         shamt := UInt(2)
       }
       is(MSIZE_H) {
@@ -337,6 +338,52 @@ class Decode() extends Module {
       isStack := Bool(true)
     }
     decoded(0) := Bool(true)
+  }
+
+  io.decex.fpuOp.func := func
+  /*
+  when(opcode === OPCODE_FPU) {
+    switch(opc) {
+      is(OPC_FPUR) {
+        io.decex.wrRd(0) := Bool(true)
+        io.decex.fpuOp.isTR := Bool(true)
+        decoded(0) := Bool(true)
+      }
+      is(OPC_FPUC) {
+        io.decex.wrRd(0) := Bool(true)
+        io.decex.fpuOp.isCmp := Bool(true)
+        decoded(0) := Bool(true)
+      }
+      is(OPC_FPUL) {
+        io.decex.immOp(0) := Bool(true)
+        longImm := Bool(true)
+        io.decex.wrRd(0) := Bool(true)
+        decoded(0) := Bool(true)
+      }
+      is(OPC_FPURS) {
+        io.decex.wrRd(0) := Bool(true)
+        io.decex.fpuOp.isSR := Bool(true)
+        decoded(0) := Bool(true)
+      }
+    }
+  }
+  */
+
+  //io.decex.fpuOp.isMTF := Bool(false)
+  //io.decex.fpuOp.isMFF := Bool(false)
+  when(opcode === OPCODE_FPC) {
+    switch(opc) {
+      is(OPC_FPCT) {
+        io.decex.wrRd(0) := Bool(true)
+        io.decex.fpuOp.isMTF := Bool(true)
+        decoded(0) := Bool(true)
+      }
+      is(OPC_FPCF) {
+        io.decex.wrRd(0) := Bool(true)
+        io.decex.fpuOp.isMFF := Bool(true)
+        decoded(0) := Bool(true)
+      }
+    }
   }
 
   // Offset for loads/stores
@@ -374,7 +421,7 @@ class Decode() extends Module {
 
   // Disable register write on register 0
   for (i <- 0 until PIPE_COUNT) {
-    when(io.decex.rdAddr(i) === UInt("b00000")) {
+    when(io.decex.rdAddr(i) === UInt("b000000")) {
       io.decex.wrRd(i) := Bool(false)
     }
   }
