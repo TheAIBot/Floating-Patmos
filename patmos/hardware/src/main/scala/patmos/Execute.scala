@@ -317,6 +317,9 @@ class Execute() extends Module {
   val roundingMode = Wire(UInt(width = 3))
   val isSignaling = Wire(Bool())
   val modifySign = Wire(Bool())
+  val isMul = Wire(Bool())
+  val isAdd = Wire(Bool())
+  val useMulAdd = Wire(Bool())
   
 
 
@@ -327,6 +330,10 @@ class Execute() extends Module {
   roundingMode := consts.round_near_even
   isSignaling := Bool(false)
   modifySign := Bool(false)
+  isMul := Bool(false)
+  isAdd := Bool(false)
+  useMulAdd := Bool(false)
+
 
 
   
@@ -341,17 +348,19 @@ class Execute() extends Module {
   when(exReg.fpuOp.isTR) {
     io.exmem.rd(0).addr := exReg.rdAddr(0)
     io.exmem.rd(0).valid := exReg.wrRd(0) && doExecute(0)
-    
+
     isFpuRd := Bool(true)
     switch(exReg.fpuOp.func) {
       is(FP_FUNC_ADD) {
-
+        isAdd := Bool(true)
+        useMulAdd := Bool(true)
       }
       is(FP_FUNC_SUB) {
-        
+        useMulAdd := Bool(true)
       }
       is(FP_FUNC_MUL) {
-        
+        isMul := Bool(true)
+        useMulAdd := Bool(true)
       }
       is(FP_FUNC_DIV) {
         
@@ -433,6 +442,7 @@ class Execute() extends Module {
   val fpexceptions1 = Reg(UInt(width = 32))
   val fpexceptions2 = Reg(UInt(width = 32))
   val fpexceptions3 = Reg(UInt(width = 32))
+  val fpexceptions4 = Reg(UInt(width = 32))
 
   val fpuRs1 = op(0)
   val fpuRs2 = op(1)
@@ -444,7 +454,7 @@ class Execute() extends Module {
   val f32Rs1AsRecF32 = recFNFromFN(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH, fpuRs1)
   val f32Rs2AsRecF32 = recFNFromFN(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH, fpuRs2)
 
-  val intRs1AsRecF32 = Module(new INToRecFN(DATA_WIDTH, BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH));
+  val intRs1AsRecF32 = Module(new INToRecFN(DATA_WIDTH, BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH))
   intRs1AsRecF32.io.signedIn := recodeFromSigned
   intRs1AsRecF32.io.in := fpuRs1
   intRs1AsRecF32.io.roundingMode := roundingMode // todo: add rounding support here
@@ -458,13 +468,21 @@ class Execute() extends Module {
   // Do computations
   //
 
-  val cmpRecF32 = Module(new CompareRecFN(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH))
-  cmpRecF32.io.a := rs1AsRecF32
-  cmpRecF32.io.b := rs2AsRecF32
-  cmpRecF32.io.signaling := isSignaling
-  fpexceptions3 := cmpRecF32.io.exceptionFlags
+  val rs2RecF32RevSign = Cat(!rs2AsRecF32(rs2AsRecF32.getWidth() - 1), rs2AsRecF32(rs2AsRecF32.getWidth() - 2, 0))
+  val mulAddInputA = rs1AsRecF32
+  val mulAddInputB = Mux(isMul, rs2AsRecF32, UInt(BigInt(1)<<(BINARY32_EXP_WIDTH + BINARY32_SIG_WIDTH - 1)))
+  val mulAddInputC = Mux(isMul, ((rs1AsRecF32 ^ rs2AsRecF32) & UInt(BigInt(1)<<(BINARY32_EXP_WIDTH + BINARY32_SIG_WIDTH - 1)))<<1,
+                      Mux(isAdd, rs2AsRecF32, rs2RecF32RevSign))
 
-  val refF32Class = classifyRecFN(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH, rs1AsRecF32)
+  //val mulAddRecF32 = Module(new MulAddRecFN(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH))
+  val mulAddRecF32 = Module(new MulAddRecFN(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH))
+  mulAddRecF32.io.op := UInt(0)
+  mulAddRecF32.io.a := mulAddInputA
+  mulAddRecF32.io.b := mulAddInputB
+  mulAddRecF32.io.c := mulAddInputC
+  mulAddRecF32.io.roundingMode := roundingMode
+  mulAddRecF32.io.detectTininess := UInt(0)
+  fpexceptions4 := mulAddRecF32.io.exceptionFlags
 
   val rs1Sign = fpuRs1(DATA_WIDTH - 1)
   val rs2Sign = fpuRs2(DATA_WIDTH - 1)
@@ -473,6 +491,14 @@ class Execute() extends Module {
     (FP_FUNC_SGNJNS, !rs2Sign),
     (FP_FUNC_SGNJXS, rs1Sign ^ rs2Sign)
   ))
+
+  val cmpRecF32 = Module(new CompareRecFN(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH))
+  cmpRecF32.io.a := rs1AsRecF32
+  cmpRecF32.io.b := rs2AsRecF32
+  cmpRecF32.io.signaling := isSignaling
+  fpexceptions3 := cmpRecF32.io.exceptionFlags
+
+  val refF32Class = classifyRecFN(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH, rs1AsRecF32)
 
   //
   // Convert from recoded format
@@ -484,13 +510,15 @@ class Execute() extends Module {
   recF32AsInt.io.signedOut := recodeToSigned
   fpexceptions2 := recF32AsInt.io.intExceptionFlags
 
-  val recF32AsF32 = fNFromRecFN(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH, rs1AsRecF32)
+  val recF32AsF32Src = Mux(useMulAdd, mulAddRecF32.io.out, rs1AsRecF32)
+  val recF32AsF32 = fNFromRecFN(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH, recF32AsF32Src)
 
   when(isFpuRd) {
     io.exmem.rd(0).data := Mux(resFromRs1, fpuRs1, 
                             Mux(resFromFloat, recF32AsF32, 
                               Mux(resFromClassify, refF32Class, 
-                                Mux(modifySign, Cat(rdSign, fpuRs1(DATA_WIDTH - 2, 0)), recF32AsInt.io.out))))
+                                Mux(modifySign, Cat(rdSign, fpuRs1(DATA_WIDTH - 2, 0)),
+                                  Mux(useMulAdd, recF32AsF32, recF32AsInt.io.out)))))
   }
 
   when(isFpuPd) {
@@ -511,6 +539,7 @@ class Execute() extends Module {
   debug(fpexceptions1)
   debug(fpexceptions2)
   debug(fpexceptions3)
+  debug(fpexceptions4)
 
   // load/store
   io.exmem.mem.load := exReg.memOp.load && doExecute(0)

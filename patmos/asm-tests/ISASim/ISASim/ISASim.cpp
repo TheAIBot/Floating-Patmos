@@ -949,8 +949,8 @@ int main(int argc, char const *argv[])
 	std::string binFilePath = argv[1];
 	std::string uartFilePath = argv[2];
     
-    //#pragma STDC FENV_ACCESS ON
-    //std::fesetround(FE_TOWARDZERO);
+    #pragma STDC FENV_ACCESS ON
+    std::fesetround(FE_TONEAREST);
 	
 
 	//std::string binFilePath = "/home/cake/t-crest/patmos/asm-tests/tests/bin/fadds.bin";

@@ -634,8 +634,8 @@ int main(int argc, char const *argv[])
 
 	std::cout << "Generating tests..." << std::endl;
     
-    //#pragma STDC FENV_ACCESS ON
-    //std::fesetround(FE_TOWARDZERO);
+    #pragma STDC FENV_ACCESS ON
+    std::fesetround(FE_TONEAREST);
     
     /*
 	// ALUr
@@ -721,12 +721,13 @@ int main(int argc, char const *argv[])
 	//makeBranchNoDelayTest("brnd");
 	//makeBranchNoDelayTest("brcfnd");
 
+	*/
 	// FPUr tests
 	makeFPUrTest("fadds", std::plus<float>());
 	makeFPUrTest("fsubs", std::minus<float>());
 	makeFPUrTest("fmuls", std::multiplies<float>());
-	makeFPUrTest("fdivs", std::divides<float>());
-	*/
+	//makeFPUrTest("fdivs", std::divides<float>());
+	
 	makeFPUrTest("fsgnjs", std::copysignf);
 	makeFPUrTest("fsgnjns", [](float a, float b) { return std::copysignf(a, (!std::signbit(b)) ? -0.0f : +0.0f); });
 	makeFPUrTest("fsgnjxs", [](float a, float b) { return std::copysignf(a, (std::signbit(a) != std::signbit(b)) ? -0.0f : +0.0f); });
