@@ -727,20 +727,19 @@ int main(int argc, char const *argv[])
 	makeFPUrTest("fsubs", std::minus<float>());
 	makeFPUrTest("fmuls", std::multiplies<float>());
 	//makeFPUrTest("fdivs", std::divides<float>());
-	
 	makeFPUrTest("fsgnjs", std::copysignf);
 	makeFPUrTest("fsgnjns", [](float a, float b) { return std::copysignf(a, (!std::signbit(b)) ? -0.0f : +0.0f); });
 	makeFPUrTest("fsgnjxs", [](float a, float b) { return std::copysignf(a, (std::signbit(a) != std::signbit(b)) ? -0.0f : +0.0f); });
-    /*
+    
 	// FPUl tests
 	makeFPUlTest("faddsl", std::plus<float>());
 	makeFPUlTest("fsubsl", std::minus<float>());
 	makeFPUlTest("fmulsl", std::multiplies<float>());
-	makeFPUlTest("fdivsl", std::divides<float>());
+	//makeFPUlTest("fdivsl", std::divides<float>());
 
 	// FPUrs tests
-	makeFPUrsTest("fsqrts", [](float a) { return std::sqrt(a); });
-    */
+	//makeFPUrsTest("fsqrts", [](float a) { return std::sqrt(a); });
+    
 	// FPCt tests
 	makeFPCtTest("fcvtis", [](int32_t a) { return static_cast<float>(a); });
 	makeFPCtTest("fcvtus", [](int32_t a) { return static_cast<float>(static_cast<uint32_t>(a)); });

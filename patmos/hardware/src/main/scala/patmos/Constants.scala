@@ -108,11 +108,6 @@ object Constants {
 
   val RECODED_F32_WIDTH = 33
 
-  val RECODED_B32_EXP_WIDTH = BINARY32_EXP_WIDTH + 1
-  val RECODED_B32_SIG_WIDTH = BINARY32_SIG_WIDTH
-  val RECODED_B32_SGN_WIDTH = 1
-  val RECODED_B32_WIDTH = RECODED_B32_EXP_WIDTH + RECODED_B32_SIG_WIDTH + RECODED_B32_SGN_WIDTH
-
   val OPCODE_ALUI = UInt("b00")
   val OPCODE_ALU = UInt("b01000")
   val OPCODE_SPC = UInt("b01001")
@@ -247,4 +242,13 @@ object Constants {
   val FP_CFUNC_EQ  = UInt("b0000")
   val FP_CFUNC_LT  = UInt("b0001")
   val FP_CFUNC_LE  = UInt("b0010")
+
+  val FPU_RD_WIDTH = 3
+  val FPU_RD_FROM_FLOAT   = UInt("b000")
+  val FPU_RD_FROM_RS1     = UInt("b001")
+  val FPU_RD_FROM_INT     = UInt("b010")
+  val FPU_RD_FROM_CLASS   = UInt("b011")
+  val FPU_RD_FROM_SIGN    = UInt("b100")
+  val FPU_RD_FROM_MULADD  = UInt("b101")
+  val FPU_RD_FROM_DIVSQRT = UInt("b110")
 }
