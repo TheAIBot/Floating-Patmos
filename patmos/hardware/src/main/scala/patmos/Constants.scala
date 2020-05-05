@@ -198,11 +198,12 @@ object Constants {
   val JFUNC_BR    = UInt("b0101")
   val JFUNC_BRCF  = UInt("b1010")
 
-  val SPEC_FL = UInt("b0000")
-  val SPEC_SL = UInt("b0010")
-  val SPEC_SH = UInt("b0011")
-  val SPEC_SS = UInt("b0101")
-  val SPEC_ST = UInt("b0110")
+  val SPEC_FL   = UInt("b0000")
+  val SPEC_FCSR = UInt("b0001")
+  val SPEC_SL   = UInt("b0010")
+  val SPEC_SH   = UInt("b0011")
+  val SPEC_SS   = UInt("b0101")
+  val SPEC_ST   = UInt("b0110")
 
   val SPEC_SRB = UInt("b0111")
   val SPEC_SRO = UInt("b1000")

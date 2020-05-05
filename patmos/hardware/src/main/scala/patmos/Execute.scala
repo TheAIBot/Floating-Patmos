@@ -149,6 +149,8 @@ class Execute() extends Module {
   val excBaseReg = Reg(UInt(width = DATA_WIDTH))
   val excOffReg = Reg(UInt(width = DATA_WIDTH))
 
+  val fcsr = RegInit(UInt(0, width = DATA_WIDTH))
+
   // MS: maybe the multiplication should be in a local component?
 
   // multiplication result registers
@@ -231,6 +233,9 @@ class Execute() extends Module {
           predReg := op(2*i)(PRED_COUNT-1, 0)
           predReg(0) := Bool(true)
         }
+        is(SPEC_FCSR) {
+          fcsr := op(2*i)
+        }
         is(SPEC_SL) {
           mulLoReg := op(2*i)
         }
@@ -262,6 +267,9 @@ class Execute() extends Module {
     switch(exReg.aluOp(i).func) {
       is(SPEC_FL) {
         mfsResult := Cat(UInt(0, DATA_WIDTH-PRED_COUNT), predReg.asUInt()).asUInt()
+      }
+      is(SPEC_FCSR) {
+        mfsResult := fcsr
       }
       is(SPEC_SL) {
         mfsResult := mulLoReg
@@ -302,97 +310,7 @@ class Execute() extends Module {
   //#### FPU land ####
   //##################
 
-  val isFpuRd = Wire(Bool())
-  val isFpuPd = Wire(Bool())
-  val recodeFromSigned = Wire(Bool())
-  val recodeToSigned = Wire(Bool())
-  val roundingMode = Wire(UInt(width = 3))
-  val isSignaling = Wire(Bool())
-  val fpuRdSrc = UInt(width = FPU_RD_WIDTH)
-  
-  isFpuRd := Bool(false)
-  isFpuPd := Bool(false)
-  recodeFromSigned := Bool(false)
-  recodeToSigned := Bool(false)
-  roundingMode := consts.round_near_even
-  isSignaling := Bool(false)
-  fpuRdSrc := UInt(0)
-
-
-
-  when(exReg.fpuOp.isTR) {
-    isFpuRd := Bool(true)
-    switch(exReg.fpuOp.func) {
-      is(FP_FUNC_ADD, FP_FUNC_SUB, FP_FUNC_MUL) {
-        fpuRdSrc := FPU_RD_FROM_MULADD
-      }
-      is(FP_FUNC_DIV) {
-        fpuRdSrc := FPU_RD_FROM_DIVSQRT
-      }
-      is(FP_FUNC_SGNJS, FP_FUNC_SGNJNS, FP_FUNC_SGNJXS) {
-        fpuRdSrc := FPU_RD_FROM_SIGN
-      }
-    }
-  }
-
-  when(exReg.fpuOp.isMTF) {
-    isFpuRd := Bool(true)
-    switch(exReg.fpuOp.func) {
-      is(FP_FPCTFUNC_CVTIS) {
-        recodeFromSigned := Bool(true)
-        fpuRdSrc := FPU_RD_FROM_FLOAT
-      }
-      is(FP_FPCTFUNC_CVTUS) {
-        recodeFromSigned := Bool(false)
-        fpuRdSrc := FPU_RD_FROM_FLOAT
-      }
-      is(FP_FPCTFUNC_MVIS) {
-        fpuRdSrc := FPU_RD_FROM_RS1
-      }
-    }   
-  }
-
-  when(exReg.fpuOp.isMFF) {
-    isFpuRd := Bool(true)
-    switch(exReg.fpuOp.func) {
-      is(FP_FPCFFUNC_CVTSI) {
-        recodeToSigned := Bool(true)
-        fpuRdSrc := FPU_RD_FROM_INT
-        roundingMode := consts.round_minMag
-      }
-      is(FP_FPCFFUNC_CVTSU) {
-        recodeToSigned := Bool(false)
-        fpuRdSrc := FPU_RD_FROM_INT
-        roundingMode := consts.round_minMag
-      }
-      is(FP_FPCFFUNC_MVSI) {
-        fpuRdSrc := FPU_RD_FROM_RS1
-      }
-      is(FP_FPCFFUNC_CLASS) {
-        fpuRdSrc := FPU_RD_FROM_CLASS
-      }
-    }
-  }
-
-  when(exReg.fpuOp.isCmp) {
-    isFpuPd := Bool(true)
-    switch(exReg.fpuOp.func) {
-      is(FP_CFUNC_EQ) {
-        isSignaling := Bool(false)
-      }
-      is(FP_CFUNC_LT) {
-        isSignaling := Bool(true)
-      }
-      is(FP_CFUNC_LE) {
-        isSignaling := Bool(true)
-      }
-    }
-  }
-
-  val fpPrepExceptions = Reg(UInt(width = 32))
-  val fpurlExceptions = Reg(UInt(width = 32))
-  val fpexceptions3 = Reg(UInt(width = 32))
-  val fpucExceptions = Reg(UInt(width = 32))
+  val roundingMode = Mux(exReg.fpuOp.overrideRounding, consts.round_minMag, fcsr(7, 5))
 
   //
   //Convert to recoded format
@@ -402,9 +320,8 @@ class Execute() extends Module {
   fpuPrep.io.rs1In := op(0)
   fpuPrep.io.rs2In := op(1)
   fpuPrep.io.isrs1Float := exReg.isFloatSrc1
-  fpuPrep.io.recodeFromSigned := recodeFromSigned
+  fpuPrep.io.recodeFromSigned := exReg.fpuOp.recodeFromSigned
   fpuPrep.io.roundingMode := roundingMode
-  fpPrepExceptions := fpuPrep.io.exceptionFlags
 
 
   //
@@ -418,14 +335,12 @@ class Execute() extends Module {
   fpurl.io.rs2RecF32In := fpuPrep.io.rs2RecF32Out
   fpurl.io.fpuFunc := exReg.fpuOp.func
   fpurl.io.roundingMode := roundingMode
-  fpurlExceptions := fpurl.io.exceptionFlags
 
   val fpuc = Module(new FPUc())
   fpuc.io.rs1RecF32In := fpuPrep.io.rs1RecF32Out
   fpuc.io.rs2RecF32In := fpuPrep.io.rs2RecF32Out
   fpuc.io.fpuFunc := exReg.fpuOp.func
-  fpuc.io.isSignaling := isSignaling
-  fpucExceptions := fpuc.io.exceptionFlags
+  fpuc.io.isSignaling := exReg.fpuOp.isSignaling
 
   
 
@@ -439,56 +354,29 @@ class Execute() extends Module {
   fpuFinish.io.mulAddRecF32In := fpurl.io.mulAddRecF32Out
   fpuFinish.io.signF32In := fpurl.io.signF32Out
   fpuFinish.io.divSqrtRecF32In := UInt(0)
-  fpuFinish.io.fpuRdSrc := fpuRdSrc
+  fpuFinish.io.fpuRdSrc := exReg.fpuOp.fpuRdSrc
   fpuFinish.io.roundingMode := roundingMode
-  fpuFinish.io.recodeToSigned := recodeToSigned
-  //val exceptionFlags := fpuFinish.io.exceptionFlags
-/*
-  class FPUFinish() extends Module {
-  val io = IO(new Bundle {
-    val rs1F32In = UInt(width = DATA_WIDTH).asInput
-    val rs1RecF32Out = UInt(width = DATA_WIDTH + 1).asInput
-    val mulAddRecF32In = UInt(width = DATA_WIDTH + 1).asInput
-    val signF32In = UInt(width = DATA_WIDTH + 1).asInput
-    val divSqrtRecF32In = UInt(width = DATA_WIDTH + 1).asInput
-    val rdSrc = UInt(width = FPU_RD_WIDTH).asInput
-    val roundingMode = UInt(width = 3).asInput
-    val rdOut = UInt(width = DATA_WIDTH).asOutput
-    val exceptionFlags = UInt(width = 5).asOutput
-  })
+  fpuFinish.io.recodeToSigned := exReg.fpuOp.recodeToSigned
+  fpuFinish.io.intToF32Exceptions := fpuPrep.io.exceptionFlags
+  fpuFinish.io.mulAddExceptions := fpurl.io.exceptionFlags
+  fpuFinish.io.divSqrtExceptions := UInt(0)
 
-  val refF32Class = classifyRecFN(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH, fpuPrep.io.rs1RecF32Out)
-
-  val recF32AsInt = Module(new RecFNToIN(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH, DATA_WIDTH))
-  recF32AsInt.io.in := fpuPrep.io.rs1RecF32Out
-  recF32AsInt.io.roundingMode := roundingMode // todo: add rounding support here
-  recF32AsInt.io.signedOut := recodeToSigned
-  fpexceptions3 := recF32AsInt.io.intExceptionFlags
-
-  val recF32AsF32Src = Mux(useMulAdd, fpurl.io.rdRecF32Out, fpuPrep.io.rs1RecF32Out)
-  val recF32AsF32 = fNFromRecFN(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH, recF32AsF32Src)
-*/
-  when(isFpuRd) {
+  when(exReg.fpuOp.isFpuRd) {
     io.exmem.rd(0).addr := exReg.rdAddr(0)
     io.exmem.rd(0).valid := exReg.wrRd(0) && doExecute(0)
     io.exmem.rd(0).data := fpuFinish.io.rdOut
-    /*
-    io.exmem.rd(0).data := Mux(resFromRs1, op(0), 
-                            Mux(resFromFloat, recF32AsF32, 
-                              Mux(resFromClassify, refF32Class, 
-                                Mux(modifySign, fpurl.io.rdF32Out,
-                                  Mux(useMulAdd, recF32AsF32, recF32AsInt.io.out)))))
-                                  */
+    fcsr := Cat(fcsr(DATA_WIDTH - 1, 5), fcsr(4, 0) | fpuFinish.io.exceptionFlags)
   }
 
-  when(isFpuPd) {
+  when(exReg.fpuOp.isFpuPd) {
     predReg(exReg.predOp(0).dest) := fpuc.io.pd
+    fcsr := Cat(fcsr(DATA_WIDTH - 1, 5), fcsr(4, 0) | fpuc.io.exceptionFlags)
   }
 
-  debug(fpPrepExceptions)
-  debug(fpurlExceptions)
-  debug(fpexceptions3)
-  debug(fpucExceptions)
+  //######################
+  //#### End FPU land ####
+  //######################
+
 
   // load/store
   io.exmem.mem.load := exReg.memOp.load && doExecute(0)
@@ -561,6 +449,7 @@ class Execute() extends Module {
   // suppress writes to special registers
   when(!io.ena) {
     predReg := predReg
+    fcsr := fcsr
     mulLoReg := mulLoReg
     mulHiReg := mulHiReg
     retBaseReg := retBaseReg

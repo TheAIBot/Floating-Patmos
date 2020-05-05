@@ -637,7 +637,7 @@ int main(int argc, char const *argv[])
     #pragma STDC FENV_ACCESS ON
     std::fesetround(FE_TONEAREST);
     
-    /*
+    
 	// ALUr
 	makeALUrTest("add", std::plus<int32_t>());
 	makeALUrTest("sub", std::minus<int32_t>());
@@ -721,7 +721,7 @@ int main(int argc, char const *argv[])
 	//makeBranchNoDelayTest("brnd");
 	//makeBranchNoDelayTest("brcfnd");
 
-	*/
+	
 	// FPUr tests
 	makeFPUrTest("fadds", std::plus<float>());
 	makeFPUrTest("fsubs", std::minus<float>());

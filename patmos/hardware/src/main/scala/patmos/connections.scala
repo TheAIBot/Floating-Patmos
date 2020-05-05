@@ -61,20 +61,24 @@ class AluOp() extends Bundle() {
 
 class FpuOp() extends Bundle() {
   val func = UInt(width = 4)
-  val isTR = Bool()
-  val isSR = Bool()
-  val isCmp = Bool()
-  val isMTF = Bool()
-  val isMFF = Bool()
+  val isFpuRd = Bool()
+  val isFpuPd = Bool()
+  val recodeFromSigned = Bool()
+  val recodeToSigned = Bool()
+  val overrideRounding = Bool()
+  val isSignaling = Bool()
+  val fpuRdSrc = UInt(width = FPU_RD_WIDTH)
   val doFpuStall = Bool()
 
   def defaults() = {
     func := UInt(0)
-    isTR := Bool(false)
-    isSR := Bool(false)
-    isCmp := Bool(false)
-    isMTF := Bool(false)
-    isMFF := Bool(false)
+    isFpuRd := Bool(false)
+    isFpuPd := Bool(false)
+    recodeFromSigned := Bool(false)
+    recodeToSigned := Bool(false)
+    overrideRounding := Bool(false)
+    isSignaling := Bool(false)
+    fpuRdSrc := UInt(0)
     doFpuStall := Bool(false)
   }
 }

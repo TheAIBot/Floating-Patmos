@@ -347,44 +347,92 @@ class Decode() extends Module {
 
   when(opcode === OPCODE_FPU) {
     io.decex.fpuOp.doFpuStall := Bool(true)
+    io.decex.wrRd(0) := Bool(true)
     switch(opc) {
       is(OPC_FPUR) {
-        io.decex.wrRd(0) := Bool(true)
-        io.decex.fpuOp.isTR := Bool(true)
+        io.decex.fpuOp.isFpuRd := Bool(true)
         decoded(0) := Bool(true)
       }
       is(OPC_FPUC) {
-        io.decex.fpuOp.isCmp := Bool(true)
-        io.decex.wrRd(0) := Bool(true)
-        io.decex.fpuOp.isCmp := Bool(true)
+        io.decex.fpuOp.isFpuPd := Bool(true)
+        switch(func) {
+          is(FP_CFUNC_EQ) {
+            io.decex.fpuOp.isSignaling := Bool(false)
+          }
+          is(FP_CFUNC_LT, FP_CFUNC_LE) {
+            io.decex.fpuOp.isSignaling := Bool(true)
+          }
+        }
         decoded(0) := Bool(true)
       }
       is(OPC_FPUL) {
+        io.decex.fpuOp.isFpuRd := Bool(true)
         io.decex.immOp(0) := Bool(true)
         longImm := Bool(true)
-        io.decex.wrRd(0) := Bool(true)
-        io.decex.fpuOp.isTR := Bool(true)
         decoded(0) := Bool(true)
       }
       is(OPC_FPURS) {
-        io.decex.wrRd(0) := Bool(true)
-        io.decex.fpuOp.isSR := Bool(true)
+        io.decex.fpuOp.isFpuRd := Bool(true)
+        io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_DIVSQRT
         decoded(0) := Bool(true)
+      }
+    }
+  }
+
+  when(opcode === OPCODE_FPU && (opc === OPC_FPUR || opc === OPC_FPUL)) {
+    switch(func) {
+      is(FP_FUNC_ADD, FP_FUNC_SUB, FP_FUNC_MUL) {
+        io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_MULADD
+      }
+      is(FP_FUNC_DIV) {
+        io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_DIVSQRT
+      }
+      is(FP_FUNC_SGNJS, FP_FUNC_SGNJNS, FP_FUNC_SGNJXS) {
+        io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_SIGN
       }
     }
   }
 
   when(opcode === OPCODE_FPC) {
     io.decex.fpuOp.doFpuStall := Bool(true)
+    io.decex.wrRd(0) := Bool(true)
+    io.decex.fpuOp.isFpuRd := Bool(true)
     switch(opc) {
       is(OPC_FPCT) {
-        io.decex.wrRd(0) := Bool(true)
-        io.decex.fpuOp.isMTF := Bool(true)
+        switch(func) {
+          is(FP_FPCTFUNC_CVTIS) {
+            io.decex.fpuOp.recodeFromSigned := Bool(true)
+            io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_FLOAT
+          }
+          is(FP_FPCTFUNC_CVTUS) {
+            io.decex.fpuOp.recodeFromSigned := Bool(false)
+            io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_FLOAT
+          }
+          is(FP_FPCTFUNC_MVIS) {
+            io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_RS1
+          }
+        }  
         decoded(0) := Bool(true)
       }
       is(OPC_FPCF) {
-        io.decex.wrRd(0) := Bool(true)
-        io.decex.fpuOp.isMFF := Bool(true)
+        switch(func) {
+          is(FP_FPCFFUNC_CVTSI) {
+            io.decex.fpuOp.recodeToSigned := Bool(true)
+            io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_INT
+            io.decex.fpuOp.overrideRounding := Bool(true)
+          }
+          is(FP_FPCFFUNC_CVTSU) {
+            io.decex.fpuOp.recodeToSigned := Bool(false)
+            io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_INT
+            io.decex.fpuOp.overrideRounding := Bool(true)
+          }
+          is(FP_FPCFFUNC_MVSI) {
+            io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_RS1
+          }
+          is(FP_FPCFFUNC_CLASS) {
+            io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_CLASS
+          }
+        }
         decoded(0) := Bool(true)
       }
     }
