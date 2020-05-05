@@ -474,7 +474,6 @@ class Execute() extends Module {
   val mulAddInputC = Mux(isMul, ((rs1AsRecF32 ^ rs2AsRecF32) & UInt(BigInt(1)<<(BINARY32_EXP_WIDTH + BINARY32_SIG_WIDTH - 1)))<<1,
                       Mux(isAdd, rs2AsRecF32, rs2RecF32RevSign))
 
-  //val mulAddRecF32 = Module(new MulAddRecFN(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH))
   val mulAddRecF32 = Module(new MulAddRecFN(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH))
   mulAddRecF32.io.op := UInt(0)
   mulAddRecF32.io.a := mulAddInputA
@@ -533,7 +532,6 @@ class Execute() extends Module {
         predReg(exReg.predOp(0).dest) := !cmpRecF32.io.gt
       }
     }
-    
   }
 
   debug(fpexceptions1)

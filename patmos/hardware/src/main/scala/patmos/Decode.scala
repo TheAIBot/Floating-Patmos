@@ -59,7 +59,9 @@ class Decode() extends Module {
   decoded.map(_ := Bool(false))
 
   // Decoding of dual-issue operations
-  val dual = decReg.instr_a(INSTR_WIDTH - 1) && decReg.instr_a(26, 22) =/= OPCODE_ALUL;
+  val dual = (decReg.instr_a(INSTR_WIDTH - 1) 
+             && decReg.instr_a(26, 22) =/= OPCODE_ALUL
+             && !(decReg.instr_a(26, 22) === OPCODE_FPU && decReg.instr_a(6, 4) === OPC_FPUL))
   for (i <- 0 until PIPE_COUNT) {
     val instr   = if (i == 0) { decReg.instr_a } else { decReg.instr_b }
     val opcode  = instr(26, 22)
@@ -344,6 +346,7 @@ class Decode() extends Module {
   io.decex.isFloatSrc1 := decReg.isFloatSrc1
 
   when(opcode === OPCODE_FPU) {
+    io.decex.fpuOp.doFpuStall := Bool(true)
     switch(opc) {
       is(OPC_FPUR) {
         io.decex.wrRd(0) := Bool(true)
@@ -360,6 +363,7 @@ class Decode() extends Module {
         io.decex.immOp(0) := Bool(true)
         longImm := Bool(true)
         io.decex.wrRd(0) := Bool(true)
+        io.decex.fpuOp.isTR := Bool(true)
         decoded(0) := Bool(true)
       }
       is(OPC_FPURS) {
@@ -371,6 +375,7 @@ class Decode() extends Module {
   }
 
   when(opcode === OPCODE_FPC) {
+    io.decex.fpuOp.doFpuStall := Bool(true)
     switch(opc) {
       is(OPC_FPCT) {
         io.decex.wrRd(0) := Bool(true)

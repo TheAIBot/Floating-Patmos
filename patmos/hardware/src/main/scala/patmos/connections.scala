@@ -66,6 +66,7 @@ class FpuOp() extends Bundle() {
   val isCmp = Bool()
   val isMTF = Bool()
   val isMFF = Bool()
+  val doFpuStall = Bool()
 
   def defaults() = {
     func := UInt(0)
@@ -74,6 +75,7 @@ class FpuOp() extends Bundle() {
     isCmp := Bool(false)
     isMTF := Bool(false)
     isMFF := Bool(false)
+    doFpuStall := Bool(false)
   }
 }
 
