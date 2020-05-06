@@ -328,13 +328,16 @@ class Execute() extends Module {
   // Do computations
   //
 
-  val fpurl = Module(new FPUrl())
-  fpurl.io.rs1F32In := op(0)
-  fpurl.io.rs2F32In := op(1)
+  val fpurl = Module(new FPUrlMulAddSub())
   fpurl.io.rs1RecF32In := fpuPrep.io.rs1RecF32Out
   fpurl.io.rs2RecF32In := fpuPrep.io.rs2RecF32Out
   fpurl.io.fpuFunc := exReg.fpuOp.func
   fpurl.io.roundingMode := roundingMode
+
+  val fpurSignOps = Module(new FPUrSignOps())
+  fpurSignOps.io.rs1F32In := op(0)
+  fpurSignOps.io.rs2F32In := op(1)
+  fpurSignOps.io.fpuFunc := exReg.fpuOp.func
 
   val fpuc = Module(new FPUc())
   fpuc.io.rs1RecF32In := fpuPrep.io.rs1RecF32Out
@@ -352,7 +355,7 @@ class Execute() extends Module {
   fpuFinish.io.rs1F32In := op(0)
   fpuFinish.io.rs1RecF32In := fpuPrep.io.rs1RecF32Out
   fpuFinish.io.mulAddRecF32In := fpurl.io.mulAddRecF32Out
-  fpuFinish.io.signF32In := fpurl.io.signF32Out
+  fpuFinish.io.signF32In := fpurSignOps.io.signF32Out
   fpuFinish.io.divSqrtRecF32In := UInt(0)
   fpuFinish.io.fpuRdSrc := exReg.fpuOp.fpuRdSrc
   fpuFinish.io.roundingMode := roundingMode

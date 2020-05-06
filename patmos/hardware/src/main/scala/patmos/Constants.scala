@@ -107,6 +107,8 @@ object Constants {
   val BINARY32_SIG_WIDTH = 23 + 1
 
   val RECODED_F32_WIDTH = 33
+  val F32_EXCEPTION_WIDTH = 5
+  val F32_ROUNDING_WIDTH = 3
 
   val OPCODE_ALUI = UInt("b00")
   val OPCODE_ALU = UInt("b01000")

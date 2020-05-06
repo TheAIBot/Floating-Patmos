@@ -68,7 +68,6 @@ class FpuOp() extends Bundle() {
   val overrideRounding = Bool()
   val isSignaling = Bool()
   val fpuRdSrc = UInt(width = FPU_RD_WIDTH)
-  val doFpuStall = Bool()
 
   def defaults() = {
     func := UInt(0)
@@ -79,7 +78,6 @@ class FpuOp() extends Bundle() {
     overrideRounding := Bool(false)
     isSignaling := Bool(false)
     fpuRdSrc := UInt(0)
-    doFpuStall := Bool(false)
   }
 }
 
@@ -343,6 +341,7 @@ class DecodeIO() extends Bundle() {
   val decex = new DecEx().asOutput
   val rfWrite =  Vec.fill(PIPE_COUNT) { new Result().asInput }
   val exc = new ExcDec().asInput
+  val fpuStallTime = UInt(width = 6).asOutput
 }
 
 class ExecuteIO() extends Bundle() {
@@ -385,6 +384,7 @@ class MemoryIO() extends Bundle() {
   val exmem = new ExMem().asInput
   val memwb = new MemWb().asOutput
   val memfe = new MemFe().asOutput
+  val fpuStallTime = UInt(width = 6).asInput
   // for result forwarding
   val exResult = Vec.fill(PIPE_COUNT) { new Result().asOutput }
   // local and global accesses
