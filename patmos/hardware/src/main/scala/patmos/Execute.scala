@@ -374,14 +374,14 @@ class Execute() extends Module {
   fpuFinish.io.intToF32Exceptions := fpuPrep.io.exceptionFlags
   fpuFinish.io.roundedRecF32Exceptions := fpuRound.io.exceptionFlags
 
-  when(exReg.fpuOp.isFpuRd) {
+  when(exReg.fpuOp.isFpuRd && io.ena) {
     io.exmem.rd(0).addr := exReg.rdAddr(0)
     io.exmem.rd(0).valid := exReg.wrRd(0) && doExecute(0)
     io.exmem.rd(0).data := fpuFinish.io.rdOut
     fcsr := Cat(fcsr(DATA_WIDTH - 1, 5), fcsr(4, 0) | fpuFinish.io.exceptionFlags)
   }
 
-  when(exReg.fpuOp.isFpuPd) {
+  when(exReg.fpuOp.isFpuPd && io.ena) {
     predReg(exReg.predOp(0).dest) := fpuc.io.pd
     fcsr := Cat(fcsr(DATA_WIDTH - 1, 5), fcsr(4, 0) | fpuc.io.exceptionFlags)
   }
