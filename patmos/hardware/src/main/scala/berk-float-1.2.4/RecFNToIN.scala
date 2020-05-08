@@ -44,7 +44,7 @@ import consts._
 class RecFNToIN(expWidth: Int, sigWidth: Int, intWidth: Int) extends Module
 {
     val io = new Bundle {
-        val in = Bits(INPUT, expWidth + sigWidth + 1)
+        val in = new RawFloat(expWidth, sigWidth).asInput
         val roundingMode = UInt(INPUT, 3)
         val signedOut = Bool(INPUT)
         val out = Bits(OUTPUT, intWidth)
@@ -53,7 +53,7 @@ class RecFNToIN(expWidth: Int, sigWidth: Int, intWidth: Int) extends Module
 
     //------------------------------------------------------------------------
     //------------------------------------------------------------------------
-    val rawIn = rawFloatFromRecFN(expWidth, sigWidth, io.in)
+    val rawIn = io.in
 
     val magGeOne = rawIn.sExp(expWidth)
     val posExp = rawIn.sExp(expWidth - 1, 0)

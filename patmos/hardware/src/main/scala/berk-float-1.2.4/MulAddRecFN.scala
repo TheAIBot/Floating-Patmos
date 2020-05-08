@@ -73,10 +73,10 @@ class MulAddRecFN_interIo(expWidth: Int, sigWidth: Int) extends Bundle
 class MulAddRecFNToRaw_preMul(expWidth: Int, sigWidth: Int) extends Module
 {
     val io = new Bundle {
-        val op = Bits(INPUT, 2)
-        val a = Bits(INPUT, expWidth + sigWidth + 1)
-        val b = Bits(INPUT, expWidth + sigWidth + 1)
-        val c = Bits(INPUT, expWidth + sigWidth + 1)
+        val op = Bits(INPUT, 2).asInput
+        val a = new RawFloat(expWidth, sigWidth).asInput
+        val b = new RawFloat(expWidth, sigWidth).asInput
+        val c = new RawFloat(expWidth, sigWidth).asInput
         val mulAddA = UInt(OUTPUT, sigWidth)
         val mulAddB = UInt(OUTPUT, sigWidth)
         val mulAddC = UInt(OUTPUT, sigWidth * 2)
@@ -91,9 +91,9 @@ class MulAddRecFNToRaw_preMul(expWidth: Int, sigWidth: Int) extends Module
 
     //------------------------------------------------------------------------
     //------------------------------------------------------------------------
-    val rawA = rawFloatFromRecFN(expWidth, sigWidth, io.a)
-    val rawB = rawFloatFromRecFN(expWidth, sigWidth, io.b)
-    val rawC = rawFloatFromRecFN(expWidth, sigWidth, io.c)
+    val rawA = io.a
+    val rawB = io.b
+    val rawC = io.c
 
     val signProd = rawA.sign ^ rawB.sign ^ io.op(1)
 //*** REVIEW THE BIAS FOR 'sExpAlignedProd':
@@ -303,9 +303,9 @@ class MulAddRecFN(expWidth: Int, sigWidth: Int) extends Module
 {
     val io = new Bundle {
         val op = Bits(INPUT, 2)
-        val a = Bits(INPUT, expWidth + sigWidth + 1)
-        val b = Bits(INPUT, expWidth + sigWidth + 1)
-        val c = Bits(INPUT, expWidth + sigWidth + 1)
+        val a = new RawFloat(expWidth, sigWidth).asInput
+        val b = new RawFloat(expWidth, sigWidth).asInput
+        val c = new RawFloat(expWidth, sigWidth).asInput
         val roundingMode   = UInt(INPUT, 3)
         val detectTininess = UInt(INPUT, 1)
         val out = Bits(OUTPUT, expWidth + sigWidth + 1)

@@ -41,11 +41,11 @@ import Chisel._
 
 object classifyRecFN
 {
-    def apply(expWidth: Int, sigWidth: Int, in: Bits) =
+    def apply(expWidth: Int, sigWidth: Int, in: RawFloat) =
     {
         val minNormExp = (BigInt(1)<<(expWidth - 1)) + 2
 
-        val rawIn = rawFloatFromRecFN(expWidth, sigWidth, in)
+        val rawIn = in
         val isSigNaN = isSigNaNRawFloat(rawIn)
         val isFiniteNonzero = ! rawIn.isNaN && ! rawIn.isInf && ! rawIn.isZero
         val isSubnormal = (rawIn.sExp < SInt(minNormExp))

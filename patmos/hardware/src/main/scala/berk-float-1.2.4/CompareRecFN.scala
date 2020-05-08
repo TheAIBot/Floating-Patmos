@@ -42,8 +42,8 @@ import Chisel._
 class CompareRecFN(expWidth: Int, sigWidth: Int) extends Module
 {
     val io = new Bundle {
-        val a = Bits(INPUT, expWidth + sigWidth + 1)
-        val b = Bits(INPUT, expWidth + sigWidth + 1)
+        val a = new RawFloat(expWidth, sigWidth).asInput
+        val b = new RawFloat(expWidth, sigWidth).asInput
         val signaling = Bool(INPUT)
         val lt = Bool(OUTPUT)
         val eq = Bool(OUTPUT)
@@ -51,8 +51,8 @@ class CompareRecFN(expWidth: Int, sigWidth: Int) extends Module
         val exceptionFlags = Bits(OUTPUT, 5)
     }
 
-    val rawA = rawFloatFromRecFN(expWidth, sigWidth, io.a)
-    val rawB = rawFloatFromRecFN(expWidth, sigWidth, io.b)
+    val rawA = io.a
+    val rawB = io.b
 
     val ordered = ! rawA.isNaN && ! rawB.isNaN
     val bothInfs  = rawA.isInf  && rawB.isInf

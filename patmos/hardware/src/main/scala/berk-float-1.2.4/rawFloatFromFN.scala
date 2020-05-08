@@ -68,8 +68,7 @@ object rawFloatFromFN
         out.isZero := isZero
         out.sign   := sign
         out.sExp   := adjustedExp(expWidth, 0).zext
-        out.sig :=
-            Cat(UInt(0, 1), ! isZero, Mux(isZeroExpIn, subnormFract, fractIn))
+        out.sig := Cat(UInt(0, 1), ! isZero, Mux(isZeroExpIn, subnormFract, fractIn))
         out
     }
 }

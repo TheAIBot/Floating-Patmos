@@ -319,7 +319,7 @@ class Execute() extends Module {
   val fpuPrep = Module(new FPUPrep())
   fpuPrep.io.rs1In := op(0)
   fpuPrep.io.rs2In := op(1)
-  fpuPrep.io.isrs1Float := exReg.isFloatSrc1
+  //fpuPrep.io.isrs1Float := exReg.isFloatSrc1
   fpuPrep.io.recodeFromSigned := exReg.fpuOp.recodeFromSigned
   fpuPrep.io.roundingMode := roundingMode
 
@@ -329,8 +329,8 @@ class Execute() extends Module {
   //
 
   val fpurl = Module(new FPUrlMulAddSub())
-  fpurl.io.rs1RecF32In := fpuPrep.io.rs1RecF32Out
-  fpurl.io.rs2RecF32In := fpuPrep.io.rs2RecF32Out
+  fpurl.io.rs1RawF32In := fpuPrep.io.floatRs1RawF32Out
+  fpurl.io.rs2RawF32In := fpuPrep.io.rs2RawF32Out
   fpurl.io.fpuFunc := exReg.fpuOp.func
   fpurl.io.roundingMode := roundingMode
 
@@ -340,8 +340,8 @@ class Execute() extends Module {
   fpurSignOps.io.fpuFunc := exReg.fpuOp.func
 
   val fpuc = Module(new FPUc())
-  fpuc.io.rs1RecF32In := fpuPrep.io.rs1RecF32Out
-  fpuc.io.rs2RecF32In := fpuPrep.io.rs2RecF32Out
+  fpuc.io.rs1RawF32In := fpuPrep.io.floatRs1RawF32Out
+  fpuc.io.rs2RawF32In := fpuPrep.io.rs2RawF32Out
   fpuc.io.fpuFunc := exReg.fpuOp.func
   fpuc.io.isSignaling := exReg.fpuOp.isSignaling
 
@@ -353,7 +353,8 @@ class Execute() extends Module {
 
   val fpuFinish = Module(new FPUFinish())
   fpuFinish.io.rs1F32In := op(0)
-  fpuFinish.io.rs1RecF32In := fpuPrep.io.rs1RecF32Out
+  fpuFinish.io.intRs1RecF32In := fpuPrep.io.intRs1RecF32Out
+  fpuFinish.io.floatRs1RawF32In := fpuPrep.io.floatRs1RawF32Out
   fpuFinish.io.mulAddRecF32In := fpurl.io.mulAddRecF32Out
   fpuFinish.io.signF32In := fpurSignOps.io.signF32Out
   fpuFinish.io.divSqrtRecF32In := UInt(0)
