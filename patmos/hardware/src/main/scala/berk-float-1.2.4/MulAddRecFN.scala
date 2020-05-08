@@ -328,10 +328,9 @@ class MulAddRecFN(expWidth: Int, sigWidth: Int) extends Module
              mulAddRecFNToRaw_preMul.io.mulAddB) +&
             mulAddRecFNToRaw_preMul.io.mulAddC
 
-    mulAddRecFNToRaw_postMul.io.fromPreMul :=
-        mulAddRecFNToRaw_preMul.io.toPostMul
-    mulAddRecFNToRaw_postMul.io.mulAddResult := mulAddResult
-    mulAddRecFNToRaw_postMul.io.roundingMode := io.roundingMode
+    mulAddRecFNToRaw_postMul.io.fromPreMul := RegNext(mulAddRecFNToRaw_preMul.io.toPostMul)
+    mulAddRecFNToRaw_postMul.io.mulAddResult := RegNext(mulAddResult)
+    mulAddRecFNToRaw_postMul.io.roundingMode := RegNext(io.roundingMode)
 
     //------------------------------------------------------------------------
     //------------------------------------------------------------------------
