@@ -319,7 +319,6 @@ class Execute() extends Module {
   val fpuPrep = Module(new FPUPrep())
   fpuPrep.io.rs1In := op(0)
   fpuPrep.io.rs2In := op(1)
-  //fpuPrep.io.isrs1Float := exReg.isFloatSrc1
   fpuPrep.io.recodeFromSigned := exReg.fpuOp.recodeFromSigned
   fpuPrep.io.roundingMode := roundingMode
 
@@ -330,7 +329,7 @@ class Execute() extends Module {
 
   val fpurl = Module(new FPUrlMulAddSub())
   fpurl.io.rs1RawF32In := fpuPrep.io.floatRs1RawF32Out
-  fpurl.io.rs2RawF32In := fpuPrep.io.rs2RawF32Out
+  fpurl.io.rs2RawF32In := fpuPrep.io.floatRs2RawF32Out
   fpurl.io.fpuFunc := exReg.fpuOp.func
   fpurl.io.roundingMode := roundingMode
 
@@ -341,11 +340,23 @@ class Execute() extends Module {
 
   val fpuc = Module(new FPUc())
   fpuc.io.rs1RawF32In := fpuPrep.io.floatRs1RawF32Out
-  fpuc.io.rs2RawF32In := fpuPrep.io.rs2RawF32Out
+  fpuc.io.rs2RawF32In := fpuPrep.io.floatRs2RawF32Out
   fpuc.io.fpuFunc := exReg.fpuOp.func
   fpuc.io.isSignaling := exReg.fpuOp.isSignaling
 
-  
+  //
+  // Round to RecF32
+  //
+
+  val fpuRound = Module(new FPURound())
+  fpuRound.io.mulAddRawF32 := fpurl.io.mulAddRawF32Out
+  fpuRound.io.mulAddInvalidExc := fpurl.io.invalidExc
+  fpuRound.io.mulAddInfiniteExc := Bool(false)
+  fpuRound.io.divSqrtRawF32 := rawFloatFromIN(Bool(false), UInt(0, DATA_WIDTH))
+  fpuRound.io.divSqrtInvalidExc := Bool(false)
+  fpuRound.io.divSqrtInfiniteExc := Bool(false)
+  fpuRound.io.fpuRdSrc := exReg.fpuOp.fpuRdSrc
+  fpuRound.io.roundingMode := roundingMode  
 
   //
   // Convert from recoded format
@@ -353,17 +364,15 @@ class Execute() extends Module {
 
   val fpuFinish = Module(new FPUFinish())
   fpuFinish.io.rs1F32In := op(0)
-  fpuFinish.io.intRs1RecF32In := fpuPrep.io.intRs1RecF32Out
   fpuFinish.io.floatRs1RawF32In := fpuPrep.io.floatRs1RawF32Out
-  fpuFinish.io.mulAddRecF32In := fpurl.io.mulAddRecF32Out
+  fpuFinish.io.intRs1RecF32In := fpuPrep.io.intRs1RecF32Out
+  fpuFinish.io.roundedRecF32In := fpuRound.io.roundedRecF32
   fpuFinish.io.signF32In := fpurSignOps.io.signF32Out
-  fpuFinish.io.divSqrtRecF32In := UInt(0)
   fpuFinish.io.fpuRdSrc := exReg.fpuOp.fpuRdSrc
   fpuFinish.io.roundingMode := roundingMode
   fpuFinish.io.recodeToSigned := exReg.fpuOp.recodeToSigned
   fpuFinish.io.intToF32Exceptions := fpuPrep.io.exceptionFlags
-  fpuFinish.io.mulAddExceptions := fpurl.io.exceptionFlags
-  fpuFinish.io.divSqrtExceptions := UInt(0)
+  fpuFinish.io.roundedRecF32Exceptions := fpuRound.io.exceptionFlags
 
   when(exReg.fpuOp.isFpuRd) {
     io.exmem.rd(0).addr := exReg.rdAddr(0)

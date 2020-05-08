@@ -13,7 +13,7 @@ class FPUPrep() extends Module {
     val roundingMode = UInt(width = F32_ROUNDING_WIDTH).asInput
     val intRs1RecF32Out = UInt(width = RECODED_F32_WIDTH).asOutput
     val floatRs1RawF32Out = new RawFloat(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH).asOutput
-    val rs2RawF32Out = new RawFloat(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH).asOutput
+    val floatRs2RawF32Out = new RawFloat(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH).asOutput
     val exceptionFlags = UInt(width = F32_EXCEPTION_WIDTH).asOutput
   })
 
@@ -25,10 +25,10 @@ class FPUPrep() extends Module {
   intRs1AsRecF32.io.in := io.rs1In
   intRs1AsRecF32.io.roundingMode := io.roundingMode
   intRs1AsRecF32.io.detectTininess := UInt(0)
-
-  io.intRs1RecF32Out := RegNext(intRs1AsRecF32.io.out)
+  
   io.floatRs1RawF32Out := RegNext(f32Rs1AsRawF32)
-  io.rs2RawF32Out := RegNext(f32Rs2AsRawF32)
+  io.floatRs2RawF32Out := RegNext(f32Rs2AsRawF32)
+  io.intRs1RecF32Out := RegNext(intRs1AsRecF32.io.out)
   io.exceptionFlags := RegNext(intRs1AsRecF32.io.exceptionFlags)
 }
 
@@ -38,8 +38,8 @@ class FPUrlMulAddSub() extends Module {
       val rs2RawF32In = new RawFloat(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH).asInput
       val fpuFunc = UInt(width = 4).asInput
       val roundingMode = UInt(width = F32_ROUNDING_WIDTH).asInput
-      val mulAddRecF32Out = UInt(width = RECODED_F32_WIDTH).asOutput
-      val exceptionFlags = UInt(width = F32_EXCEPTION_WIDTH).asOutput
+      val mulAddRawF32Out = new RawFloat(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH + 2).asOutput
+      val invalidExc = Bool().asOutput
   })
 
   val isMul = io.fpuFunc === FP_FUNC_MUL
@@ -64,10 +64,9 @@ class FPUrlMulAddSub() extends Module {
   mulAddRecF32.io.b := mulAddInputB
   mulAddRecF32.io.c := mulAddInputC
   mulAddRecF32.io.roundingMode := io.roundingMode
-  mulAddRecF32.io.detectTininess := UInt(0)
   
-  io.mulAddRecF32Out := RegNext(mulAddRecF32.io.out)
-  io.exceptionFlags := RegNext(mulAddRecF32.io.exceptionFlags)
+  io.mulAddRawF32Out := RegNext(mulAddRecF32.io.out)
+  io.invalidExc := RegNext(mulAddRecF32.io.invalidExc)
 }
 
 class FPUrSignOps() extends Module {
@@ -112,27 +111,50 @@ class FPUc() extends Module {
   io.exceptionFlags := RegNext(cmpRecF32.io.exceptionFlags)
 }
 
-class FPURound() extends Modue {
+class FPURound() extends Module {
   val io = IO(new Bundle {
-    
+    val mulAddRawF32 = new RawFloat(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH + 2).asInput
+    val mulAddInvalidExc = Bool().asInput
+    val mulAddInfiniteExc = Bool().asInput
+    val divSqrtRawF32 = new RawFloat(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH + 2).asInput
+    val divSqrtInvalidExc = Bool().asInput
+    val divSqrtInfiniteExc = Bool().asInput
+    val fpuRdSrc = UInt(width = FPU_RD_WIDTH).asInput
+    val roundingMode = UInt(width = F32_ROUNDING_WIDTH).asInput
+    val roundedRecF32 = UInt(width = RECODED_F32_WIDTH).asOutput
+    val exceptionFlags = UInt(width = F32_EXCEPTION_WIDTH).asOutput
   })
+
+  val rawF32Src      = Mux(io.fpuRdSrc === FPU_RD_FROM_MULADD, io.mulAddRawF32, io.divSqrtRawF32)
+  val invalidExcSrc  = Mux(io.fpuRdSrc === FPU_RD_FROM_MULADD, io.mulAddInvalidExc, io.divSqrtInvalidExc)
+  val infiniteExcSrc = Mux(io.fpuRdSrc === FPU_RD_FROM_MULADD, io.mulAddInfiniteExc, io.divSqrtInfiniteExc)
+
+    val roundAnyRawFNToRecFN =
+      Module(new RoundAnyRawFNToRecFN(
+        io.mulAddRawF32.expWidth, io.mulAddRawF32.sigWidth, BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH, 0))
+    roundAnyRawFNToRecFN.io.invalidExc     := invalidExcSrc
+    roundAnyRawFNToRecFN.io.infiniteExc    := infiniteExcSrc
+    roundAnyRawFNToRecFN.io.in             := rawF32Src
+    roundAnyRawFNToRecFN.io.roundingMode   := io.roundingMode
+    roundAnyRawFNToRecFN.io.detectTininess := UInt(0)
+
+    io.roundedRecF32  := RegNext(roundAnyRawFNToRecFN.io.out)
+    io.exceptionFlags := RegNext(roundAnyRawFNToRecFN.io.exceptionFlags)
 }
 
 
 class FPUFinish() extends Module {
   val io = IO(new Bundle {
     val rs1F32In = UInt(width = DATA_WIDTH).asInput
-    val intRs1RecF32In = UInt(width = RECODED_F32_WIDTH).asInput
     val floatRs1RawF32In = new RawFloat(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH).asInput
-    val mulAddRecF32In = UInt(width = RECODED_F32_WIDTH).asInput
+    val intRs1RecF32In = UInt(width = RECODED_F32_WIDTH).asInput
+    val roundedRecF32In = UInt(width = RECODED_F32_WIDTH).asInput
     val signF32In = UInt(width = DATA_WIDTH).asInput
-    val divSqrtRecF32In = UInt(width = RECODED_F32_WIDTH).asInput
     val fpuRdSrc = UInt(width = FPU_RD_WIDTH).asInput
     val roundingMode = UInt(width = F32_ROUNDING_WIDTH).asInput
     val recodeToSigned = Bool().asInput
     val intToF32Exceptions = UInt(width = F32_EXCEPTION_WIDTH).asInput
-    val mulAddExceptions = UInt(width = F32_EXCEPTION_WIDTH).asInput
-    val divSqrtExceptions = UInt(width = F32_EXCEPTION_WIDTH).asInput
+    val roundedRecF32Exceptions = UInt(width = F32_EXCEPTION_WIDTH).asInput
     val rdOut = UInt(width = DATA_WIDTH).asOutput
     val exceptionFlags = UInt(width = F32_EXCEPTION_WIDTH).asOutput
   })
@@ -144,11 +166,7 @@ class FPUFinish() extends Module {
   recF32AsInt.io.roundingMode := io.roundingMode
   recF32AsInt.io.signedOut := io.recodeToSigned
 
-  val recF32AsF32Src = MuxLookup(io.fpuRdSrc, UInt(0), Array(
-      (FPU_RD_FROM_FLOAT  , io.intRs1RecF32In),
-      (FPU_RD_FROM_MULADD, io.mulAddRecF32In),
-      (FPU_RD_FROM_DIVSQRT, io.divSqrtRecF32In)
-  ))
+  val recF32AsF32Src = Mux(io.fpuRdSrc === FPU_RD_FROM_FLOAT, io.intRs1RecF32In, io.roundedRecF32In)
   val recF32AsF32 = fNFromRecFN(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH, recF32AsF32Src)
 
   io.rdOut := MuxLookup(io.fpuRdSrc, UInt(0), Array(
@@ -167,7 +185,7 @@ class FPUFinish() extends Module {
       (FPU_RD_FROM_INT    , recF32AsInt.io.intExceptionFlags),
       (FPU_RD_FROM_CLASS  , UInt(0)),
       (FPU_RD_FROM_SIGN   , UInt(0)),
-      (FPU_RD_FROM_MULADD , io.mulAddExceptions),
-      (FPU_RD_FROM_DIVSQRT, io.divSqrtExceptions)
+      (FPU_RD_FROM_MULADD , io.roundedRecF32Exceptions),
+      (FPU_RD_FROM_DIVSQRT, io.roundedRecF32Exceptions)
   ))
 }

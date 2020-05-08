@@ -307,9 +307,8 @@ class MulAddRecFN(expWidth: Int, sigWidth: Int) extends Module
         val b = new RawFloat(expWidth, sigWidth).asInput
         val c = new RawFloat(expWidth, sigWidth).asInput
         val roundingMode   = UInt(INPUT, 3)
-        val detectTininess = UInt(INPUT, 1)
-        val out = Bits(OUTPUT, expWidth + sigWidth + 1)
-        val exceptionFlags = Bits(OUTPUT, 5)
+        val out = new RawFloat(expWidth, sigWidth + 2).asOutput
+        val invalidExc = Bool(OUTPUT)
     }
 
     //------------------------------------------------------------------------
@@ -336,14 +335,7 @@ class MulAddRecFN(expWidth: Int, sigWidth: Int) extends Module
 
     //------------------------------------------------------------------------
     //------------------------------------------------------------------------
-    val roundRawFNToRecFN =
-        Module(new RoundRawFNToRecFN(expWidth, sigWidth, 0))
-    roundRawFNToRecFN.io.invalidExc   := mulAddRecFNToRaw_postMul.io.invalidExc
-    roundRawFNToRecFN.io.infiniteExc  := Bool(false)
-    roundRawFNToRecFN.io.in           := mulAddRecFNToRaw_postMul.io.rawOut
-    roundRawFNToRecFN.io.roundingMode := io.roundingMode
-    roundRawFNToRecFN.io.detectTininess := io.detectTininess
-    io.out            := roundRawFNToRecFN.io.out
-    io.exceptionFlags := roundRawFNToRecFN.io.exceptionFlags
+    io.out := mulAddRecFNToRaw_postMul.io.rawOut
+    io.invalidExc := mulAddRecFNToRaw_postMul.io.invalidExc
 }
 
