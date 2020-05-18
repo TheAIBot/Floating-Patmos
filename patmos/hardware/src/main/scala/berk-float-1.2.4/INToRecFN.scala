@@ -66,7 +66,7 @@ class INToRecFN(intWidth: Int, expWidth: Int, sigWidth: Int) extends Module
                 ))
     roundAnyRawFNToRecFN.io.invalidExc     := Bool(false)
     roundAnyRawFNToRecFN.io.infiniteExc    := Bool(false)
-    roundAnyRawFNToRecFN.io.in             := intAsRawFloat
+    roundAnyRawFNToRecFN.io.in             := RegNext(intAsRawFloat)
     roundAnyRawFNToRecFN.io.roundingMode   := io.roundingMode
     roundAnyRawFNToRecFN.io.detectTininess := io.detectTininess
     io.out            := roundAnyRawFNToRecFN.io.out

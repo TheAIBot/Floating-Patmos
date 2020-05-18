@@ -109,7 +109,8 @@ class MulAddRecFNToRaw_preMul(expWidth: Int, sigWidth: Int) extends Module
     val isMinCAlign = rawA.isZero || rawB.isZero || (sNatCAlignDist < SInt(0))
     val CIsDominant =
         ! rawC.isZero && (isMinCAlign || (posNatCAlignDist <= UInt(sigWidth)))
-    val CAlignDist =
+    val CAlignDist = Reg(UInt(width = UInt(sigSumWidth - 1).getWidth))
+    CAlignDist := 
         Mux(isMinCAlign,
             UInt(0),
             Mux(posNatCAlignDist < UInt(sigSumWidth - 1),
@@ -203,7 +204,7 @@ class MulAddRecFNToRaw_postMul(expWidth: Int, sigWidth: Int) extends Module
     //------------------------------------------------------------------------
     val CDom_sign = opSignC
     val CDom_sExp = io.fromPreMul.sExpSum - io.fromPreMul.doSubMags.zext
-    val CDom_absSigSum =
+    val CDom_absSigSum = RegNext(
         Mux(io.fromPreMul.doSubMags,
             ~sigSum(sigSumWidth - 1, sigWidth + 1),
             Cat(UInt(0, 1),
@@ -211,18 +212,18 @@ class MulAddRecFNToRaw_postMul(expWidth: Int, sigWidth: Int) extends Module
                 io.fromPreMul.highAlignedSigC(sigWidth + 1, sigWidth),
                 sigSum(sigSumWidth - 3, sigWidth + 2)
             )
-        )
-    val CDom_absSigSumExtra =
+        ))
+    val CDom_absSigSumExtra = RegNext(
         Mux(io.fromPreMul.doSubMags,
             (~sigSum(sigWidth, 1)).orR,
             sigSum(sigWidth + 1, 1).orR
-        )
-    val CDom_mainSig =
+        ))
+    val CDom_mainSig = RegNext(
         (CDom_absSigSum<<io.fromPreMul.CDom_CAlignDist)(
-            sigWidth * 2 + 1, sigWidth - 3)
-    val CDom_reduced4SigExtra =
+            sigWidth * 2 + 1, sigWidth - 3))
+    val CDom_reduced4SigExtra = RegNext(
         (orReduceBy4(CDom_absSigSum(sigWidth - 1, 0)<<(~sigWidth & 3)) &
-             lowMask(io.fromPreMul.CDom_CAlignDist>>2, 0, sigWidth>>2)).orR
+             lowMask(io.fromPreMul.CDom_CAlignDist>>2, 0, sigWidth>>2)).orR)
     val CDom_sig =
         Cat(CDom_mainSig>>3,
             CDom_mainSig(2, 0).orR || CDom_reduced4SigExtra ||
