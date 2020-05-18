@@ -352,6 +352,7 @@ class ExecuteIO() extends Bundle() {
   val exmem = new ExMem().asOutput
   val exicache = new ExICache().asOutput
   val feex = new FeEx().asInput
+  val fpuDoneNext = Bool().asOutput
   // forwarding inputs
   val exResult = Vec.fill(PIPE_COUNT) { new Result().asInput }
   val memResult = Vec.fill(PIPE_COUNT) { new Result().asInput }
@@ -385,6 +386,7 @@ class MemoryIO() extends Bundle() {
   val memwb = new MemWb().asOutput
   val memfe = new MemFe().asOutput
   val fpuStallTime = UInt(width = 6).asInput
+  val fpuDoneNext = Bool().asInput
   // for result forwarding
   val exResult = Vec.fill(PIPE_COUNT) { new Result().asOutput }
   // local and global accesses

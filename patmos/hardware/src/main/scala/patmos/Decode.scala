@@ -374,6 +374,7 @@ class Decode() extends Module {
       }
       is(OPC_FPURS) {
         io.decex.fpuOp.isFpuRd := Bool(true)
+        io.fpuStallTime := UInt(28)
         io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_DIVSQRT
         decoded(0) := Bool(true)
       }
@@ -387,7 +388,7 @@ class Decode() extends Module {
         io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_MULADD
       }
       is(FP_FUNC_DIV) {
-        io.fpuStallTime := UInt(28) //??
+        io.fpuStallTime := UInt(28)
         io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_DIVSQRT
       }
       is(FP_FUNC_SGNJS, FP_FUNC_SGNJNS, FP_FUNC_SGNJXS) {

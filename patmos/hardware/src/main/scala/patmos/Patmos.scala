@@ -78,6 +78,10 @@ class PatmosCore(binFile: String, nr: Int, cnt: Int) extends Module {
   execute.io.exResult <> memory.io.exResult
   execute.io.memResult <> writeback.io.memResult
 
+  // FPU stall connections
+  memory.io.fpuStallTime := decode.io.fpuStallTime
+  memory.io.fpuDoneNext := execute.io.fpuDoneNext
+
   // Connect stack cache
   execute.io.exsc <> dcache.io.scIO.exsc
   dcache.io.scIO.scex <> execute.io.scex
@@ -121,7 +125,6 @@ class PatmosCore(binFile: String, nr: Int, cnt: Int) extends Module {
 
   // Enable signals for memory stage, method cache and stack cache
   memory.io.ena_in := icache.io.ena_out && !dcache.io.scIO.stall
-  memory.io.fpuStallTime := decode.io.fpuStallTime
   icache.io.ena_in := memory.io.ena_out && !dcache.io.scIO.stall
   dcache.io.scIO.ena_in := memory.io.ena_out && icache.io.ena_out
 

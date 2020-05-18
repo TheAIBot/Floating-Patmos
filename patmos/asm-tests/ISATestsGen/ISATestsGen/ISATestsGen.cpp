@@ -404,7 +404,7 @@ void makeFPUrsTest(std::string instrName, std::function<float(float)> op)
 	float f1 = 17.0f;
 	float f2 = 1.0f;
 	float f3 = 3.27f;
-	float f4 = -5.78;
+	float f4 = 123.78;
 	float f5 = 3.141592f;
 	test.setFloatReg("f1", f1);
 	test.setFloatReg("f2", f2);
@@ -726,7 +726,7 @@ int main(int argc, char const *argv[])
 	makeFPUrTest("fadds", std::plus<float>());
 	makeFPUrTest("fsubs", std::minus<float>());
 	makeFPUrTest("fmuls", std::multiplies<float>());
-	//makeFPUrTest("fdivs", std::divides<float>());
+	makeFPUrTest("fdivs", std::divides<float>());
 	makeFPUrTest("fsgnjs", std::copysignf);
 	makeFPUrTest("fsgnjns", [](float a, float b) { return std::copysignf(a, (!std::signbit(b)) ? -0.0f : +0.0f); });
 	makeFPUrTest("fsgnjxs", [](float a, float b) { return std::copysignf(a, (std::signbit(a) != std::signbit(b)) ? -0.0f : +0.0f); });
@@ -735,10 +735,10 @@ int main(int argc, char const *argv[])
 	makeFPUlTest("faddsl", std::plus<float>());
 	makeFPUlTest("fsubsl", std::minus<float>());
 	makeFPUlTest("fmulsl", std::multiplies<float>());
-	//makeFPUlTest("fdivsl", std::divides<float>());
+	makeFPUlTest("fdivsl", std::divides<float>());
 
 	// FPUrs tests
-	//makeFPUrsTest("fsqrts", [](float a) { return std::sqrt(a); });
+	makeFPUrsTest("fsqrts", [](float a) { return std::sqrt(a); });
     
 	// FPCt tests
 	makeFPCtTest("fcvtis", [](int32_t a) { return static_cast<float>(a); });

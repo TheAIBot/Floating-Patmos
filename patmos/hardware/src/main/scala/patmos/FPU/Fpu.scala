@@ -69,6 +69,37 @@ class FPUrlMulAddSub() extends Module {
   io.invalidExc := RegNext(mulAddRecF32.io.invalidExc)
 }
 
+class FPUDivSqrt() extends Module {
+  val io = IO(new Bundle {
+      val rs1RawF32In = new RawFloat(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH).asInput
+      val rs2RawF32In = new RawFloat(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH).asInput
+      val inValid = Bool().asInput
+      val fpuFunc = UInt(width = 4).asInput
+      val roundingMode = UInt(width = F32_ROUNDING_WIDTH).asInput
+      val divSqrtRawF32Out = new RawFloat(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH + 2).asOutput
+      val outValid = Bool().asOutput
+      val invalidExc = Bool().asOutput
+      val infiniteExc = Bool().asOutput
+  })
+
+  val started = RegInit(Bool(false))
+
+  val divSqrtRawF32 = Module(new DivSqrtRecFNToRaw_small(BINARY32_EXP_WIDTH, BINARY32_SIG_WIDTH, 0))
+  divSqrtRawF32.io.inValid := io.inValid
+  divSqrtRawF32.io.sqrtOp := io.fpuFunc === FP_RSFUNC_SQRT
+  divSqrtRawF32.io.a := io.rs1RawF32In
+  divSqrtRawF32.io.b := io.rs2RawF32In
+  divSqrtRawF32.io.roundingMode := io.roundingMode
+
+  started := Mux(!started, io.inValid, 
+              !(divSqrtRawF32.io.rawOutValid_div || divSqrtRawF32.io.rawOutValid_sqrt))
+
+  io.divSqrtRawF32Out := divSqrtRawF32.io.rawOut
+  io.outValid := (divSqrtRawF32.io.rawOutValid_div || divSqrtRawF32.io.rawOutValid_sqrt) && started
+  io.invalidExc := divSqrtRawF32.io.invalidExc
+  io.infiniteExc := divSqrtRawF32.io.infiniteExc
+}
+
 class FPUrSignOps() extends Module {
   val io = IO(new Bundle {
       val rs1F32In = UInt(width = DATA_WIDTH).asInput

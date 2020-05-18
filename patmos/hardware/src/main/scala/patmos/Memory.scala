@@ -41,7 +41,7 @@ class Memory() extends Module {
                 || !mayStallReg) && fpuStall === UInt(0)
   io.ena_out := enable
 
-  fpuStall := Mux(fpuStall === UInt(0), UInt(0), fpuStall - UInt(1))
+  fpuStall := Mux(fpuStall === UInt(0) || io.fpuDoneNext, UInt(0), fpuStall - UInt(1))
 
   // Register from execution stage
   when(enable && io.ena_in) {

@@ -311,9 +311,10 @@ class Execute() extends Module {
   //##################
 
   val roundingMode = Mux(exReg.fpuOp.overrideRounding, consts.round_minMag, fcsr(7, 5))
+  val divSqrtPulseReg = RegInit(Bool(false))
 
   //
-  //Convert to recoded format
+  //Convert to raw format
   //
 
   val fpuPrep = Module(new FPUPrep())
@@ -322,7 +323,10 @@ class Execute() extends Module {
   fpuPrep.io.recodeFromSigned := exReg.fpuOp.recodeFromSigned
   fpuPrep.io.roundingMode := roundingMode
 
-
+  divSqrtPulseReg := exReg.fpuOp.fpuRdSrc === FPU_RD_FROM_DIVSQRT &&
+                     RegNext(io.ena) && 
+                     !io.ena
+                     
   //
   // Do computations
   //
@@ -332,6 +336,16 @@ class Execute() extends Module {
   fpurl.io.rs2RawF32In := fpuPrep.io.floatRs2RawF32Out
   fpurl.io.fpuFunc := exReg.fpuOp.func
   fpurl.io.roundingMode := roundingMode
+
+
+
+  val fpuDivSqrt = Module(new FPUDivSqrt())
+  fpuDivSqrt.io.rs1RawF32In := fpuPrep.io.floatRs1RawF32Out
+  fpuDivSqrt.io.rs2RawF32In := fpuPrep.io.floatRs2RawF32Out
+  fpuDivSqrt.io.inValid := divSqrtPulseReg
+  fpuDivSqrt.io.fpuFunc := exReg.fpuOp.func
+  fpuDivSqrt.io.roundingMode := roundingMode
+  io.fpuDoneNext := RegNext(fpuDivSqrt.io.outValid)
 
   val fpurSignOps = Module(new FPUrSignOps())
   fpurSignOps.io.rs1F32In := op(0)
@@ -352,14 +366,14 @@ class Execute() extends Module {
   fpuRound.io.mulAddRawF32 := fpurl.io.mulAddRawF32Out
   fpuRound.io.mulAddInvalidExc := fpurl.io.invalidExc
   fpuRound.io.mulAddInfiniteExc := Bool(false)
-  fpuRound.io.divSqrtRawF32 := rawFloatFromIN(Bool(false), UInt(0, DATA_WIDTH))
-  fpuRound.io.divSqrtInvalidExc := Bool(false)
-  fpuRound.io.divSqrtInfiniteExc := Bool(false)
+  fpuRound.io.divSqrtRawF32 := fpuDivSqrt.io.divSqrtRawF32Out
+  fpuRound.io.divSqrtInvalidExc := fpuDivSqrt.io.invalidExc
+  fpuRound.io.divSqrtInfiniteExc := fpuDivSqrt.io.infiniteExc
   fpuRound.io.fpuRdSrc := exReg.fpuOp.fpuRdSrc
   fpuRound.io.roundingMode := roundingMode  
 
   //
-  // Convert from recoded format
+  // Convert format
   //
 
   val fpuFinish = Module(new FPUFinish())

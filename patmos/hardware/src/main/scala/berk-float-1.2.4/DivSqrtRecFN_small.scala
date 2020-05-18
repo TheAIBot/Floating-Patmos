@@ -55,8 +55,8 @@ class
         val inReady        = Bool(OUTPUT)
         val inValid        = Bool(INPUT)
         val sqrtOp         = Bool(INPUT)
-        val a              = Bits(INPUT, expWidth + sigWidth + 1)
-        val b              = Bits(INPUT, expWidth + sigWidth + 1)
+        val a              = new RawFloat(expWidth, sigWidth).asInput
+        val b              = new RawFloat(expWidth, sigWidth).asInput
         val roundingMode   = UInt(INPUT, 3)
         /*--------------------------------------------------------------------
         *--------------------------------------------------------------------*/
@@ -93,8 +93,8 @@ class
 
     /*------------------------------------------------------------------------
     *------------------------------------------------------------------------*/
-    val rawA_S = rawFloatFromRecFN(expWidth, sigWidth, io.a)
-    val rawB_S = rawFloatFromRecFN(expWidth, sigWidth, io.b)
+    val rawA_S = io.a
+    val rawB_S = io.b
 
 //*** IMPROVE THESE:
     val notSigNaNIn_invalidExc_S_div =
