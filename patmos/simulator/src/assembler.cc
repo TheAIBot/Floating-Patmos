@@ -94,6 +94,23 @@ namespace patmos
     return true;
   }
 
+  bool lexer_t::get_value(single_t &value, bool negate) const {
+    if (!is_digit()) return false;
+
+    char *nptr;
+    value = strtof(Token.c_str(), &nptr);
+
+    if (*nptr != '\0') {
+      return false;
+    }
+
+    if (negate) {
+      value = -value;
+    }
+
+    return true;
+  }
+
   bool lexer_t::is_name() const {
     return !Token.empty() && is_name_start(Token[0]);
   }
@@ -265,6 +282,83 @@ namespace patmos
     return true;
   }
 
+    bool line_parser_t::parse_expression(single_t &value, reloc_info_t &reloc,
+                                       bool require_paren)
+  {
+    bool has_paren = false;
+    if (Lexer.tok() == "(") {
+      has_paren = true;
+      if (!Lexer.next()) {
+        set_error("missing expression.");
+        return false;
+      }
+    }
+
+    if (Lexer.is_name()) {
+      reloc.SymA = Lexer.tok();
+      value = 0;
+    } else {
+      bool negate = match_token("-");
+
+      if (!Lexer.get_value(value, false)) {
+        set_error("Error parsing number.");
+        return false;
+      }
+
+      if (negate)
+        value = -value;
+    }
+
+    if (!Lexer.next()) {
+      if (has_paren) {
+        set_error("missing ')'.");
+      }
+      return !has_paren;
+    }
+
+    if (!reloc.SymA.empty()) {
+      // TODO allow for 'SymA - SymB +|- Addend', 'SymA +|- Addend'
+
+      if (Lexer.tok() == "-") {
+        if (require_paren && !has_paren) {
+          set_error("parenthesis required for expressions.");
+          return false;
+        }
+
+        if (!Lexer.next()) {
+          set_error("missing symbol or value.");
+          return false;
+        }
+        if (Lexer.is_name()) {
+          reloc.SymB = Lexer.tok();
+        } else if (!Lexer.get_value(reloc.Addend, true)) {
+          set_error("Error parsing number.");
+          return false;
+        }
+        if (!Lexer.next()) {
+          // missing closing parenthesis
+          if (has_paren) {
+            set_error("missing ')'.");
+          }
+          return !has_paren;
+        }
+      }
+    }
+
+    if (has_paren) {
+      if (Lexer.tok() == ")") {
+        Lexer.next();
+      } else {
+        if (has_paren) {
+          set_error("missing ')'.");
+        }
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   bool line_parser_t::parse_GPR(GPR_e &reg)
   {
     std::string name = Lexer.tok();
@@ -290,6 +384,24 @@ namespace patmos
     return true;
   }
 
+  bool line_parser_t::parse_FPR(FPR_e &reg)
+  {
+    std::string name = Lexer.tok();
+    if (name.size() < 2 || name[0] != 'f') {
+      set_error("invalid FPR register name.");
+      return false;
+    }
+    unsigned regno;
+    if (!parse_register_number(name, 32, regno)) {
+      set_error("invalid FPR register name.");
+      return false;
+    }
+    reg = (FPR_e)regno;
+
+    Lexer.next();
+    return true;
+  }
+
   bool line_parser_t::parse_SPR(SPR_e &reg)
   {
     std::string name = Lexer.tok();
@@ -297,7 +409,9 @@ namespace patmos
       set_error("invalid SPR register name.");
       return false;
     }
-    if (name == "sl") {
+    if (name == "sfcsr") {
+      reg = s1;
+    } else if (name == "sl") {
       reg = s2;
     } else if (name == "sh") {
       reg = s3;

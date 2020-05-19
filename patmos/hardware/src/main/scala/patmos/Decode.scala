@@ -17,11 +17,11 @@ class Decode() extends Module {
   val rf = Module(new RegisterFile())
 
   // register file is connected with unregistered instruction word
-  rf.io.rfRead.rsAddr(0) := io.fedec.instr_a(16, 12)
-  rf.io.rfRead.rsAddr(1) := io.fedec.instr_a(11, 7)
+  rf.io.rfRead.rsAddr(0) := Cat(UInt(io.fedec.isFloatSrc1), io.fedec.instr_a(16, 12))
+  rf.io.rfRead.rsAddr(1) := Cat(UInt(io.fedec.isFloatSrc2), io.fedec.instr_a(11, 7))
   if (PIPE_COUNT > 1) {
-    rf.io.rfRead.rsAddr(2) := io.fedec.instr_b(16, 12)
-    rf.io.rfRead.rsAddr(3) := io.fedec.instr_b(11, 7)
+    rf.io.rfRead.rsAddr(2) := Cat(UInt(0), io.fedec.instr_b(16, 12))
+    rf.io.rfRead.rsAddr(3) := Cat(UInt(0), io.fedec.instr_b(11, 7))
   }
   rf.io.ena := io.ena
   // RF write from write back stage
@@ -41,11 +41,11 @@ class Decode() extends Module {
   io.decex.defaults()
 
   // forward RF addresses and data
-  io.decex.rsAddr(0) := decReg.instr_a(16, 12)
-  io.decex.rsAddr(1) := decReg.instr_a(11, 7)
+  io.decex.rsAddr(0) := Cat(UInt(decReg.isFloatSrc1), decReg.instr_a(16, 12))
+  io.decex.rsAddr(1) := Cat(UInt(decReg.isFloatSrc2), decReg.instr_a(11, 7))
   if (PIPE_COUNT > 1) {
-    io.decex.rsAddr(2) := decReg.instr_b(16, 12)
-    io.decex.rsAddr(3) := decReg.instr_b(11, 7)
+    io.decex.rsAddr(2) := Cat(UInt(0), decReg.instr_b(16, 12))
+    io.decex.rsAddr(3) := Cat(UInt(0), decReg.instr_b(11, 7))
   }
 
   io.decex.rsData(0) := rf.io.rfRead.rsData(0)
@@ -59,7 +59,9 @@ class Decode() extends Module {
   decoded.map(_ := Bool(false))
 
   // Decoding of dual-issue operations
-  val dual = decReg.instr_a(INSTR_WIDTH - 1) && decReg.instr_a(26, 22) =/= OPCODE_ALUL;
+  val dual = (decReg.instr_a(INSTR_WIDTH - 1) 
+             && decReg.instr_a(26, 22) =/= OPCODE_ALUL
+             && !(decReg.instr_a(26, 22) === OPCODE_FPU && decReg.instr_a(6, 4) === OPC_FPUL))
   for (i <- 0 until PIPE_COUNT) {
     val instr   = if (i == 0) { decReg.instr_a } else { decReg.instr_b }
     val opcode  = instr(26, 22)
@@ -144,12 +146,13 @@ class Decode() extends Module {
     io.decex.pred(i) := instr(30, 27)
 
     // Default destination
-    io.decex.rdAddr(i) := instr(21, 17)
+    io.decex.rdAddr(i) := Cat(UInt(0), instr(21, 17))
   }
 
   // Decoding of additional operations for first pipeline
   val instr = decReg.instr_a
   val opcode = instr(26, 22)
+  val opc = instr(6, 4)
   val func = instr(3, 0)
 
   val ldsize = instr(11, 9)
@@ -176,7 +179,7 @@ class Decode() extends Module {
   isSTC := Bool(false)
 
   // Everything except calls uses the default
-  dest := instr(21, 17)
+  dest := Cat(UInt(decReg.isFloatDst), instr(21, 17))
 
   // ALU long immediate (Bit 31 is set as well)
   when(opcode === OPCODE_ALUL && instr(6, 4) === UInt(0)) {
@@ -284,7 +287,7 @@ class Decode() extends Module {
     io.decex.memOp.load := Bool(true)
     io.decex.wrRd(0) := Bool(true)
     switch(ldsize) {
-      is(MSIZE_W) {
+      is(MSIZE_W, MSIZE_S) {
         shamt := UInt(2)
       }
       is(MSIZE_H) {
@@ -318,7 +321,7 @@ class Decode() extends Module {
     isMem := Bool(true)
     io.decex.memOp.store := Bool(true)
     switch(stsize) {
-      is(MSIZE_W) {
+      is(MSIZE_W, MSIZE_S) {
         shamt := UInt(2)
       }
       is(MSIZE_H) {
@@ -337,6 +340,110 @@ class Decode() extends Module {
       isStack := Bool(true)
     }
     decoded(0) := Bool(true)
+  }
+
+  io.decex.fpuOp.func := func
+  io.decex.isFloatSrc1 := decReg.isFloatSrc1
+  io.fpuStallTime := UInt(0)
+
+  when(opcode === OPCODE_FPU) {
+    io.decex.wrRd(0) := Bool(true)
+    switch(opc) {
+      is(OPC_FPUR) {
+        io.decex.fpuOp.isFpuRd := Bool(true)
+        decoded(0) := Bool(true)
+      }
+      is(OPC_FPUC) {
+        io.fpuStallTime := UInt(2)
+        io.decex.fpuOp.isFpuPd := Bool(true)
+        switch(func) {
+          is(FP_CFUNC_EQ) {
+            io.decex.fpuOp.isSignaling := Bool(false)
+          }
+          is(FP_CFUNC_LT, FP_CFUNC_LE) {
+            io.decex.fpuOp.isSignaling := Bool(true)
+          }
+        }
+        decoded(0) := Bool(true)
+      }
+      is(OPC_FPUL) {
+        io.decex.fpuOp.isFpuRd := Bool(true)
+        io.decex.immOp(0) := Bool(true)
+        longImm := Bool(true)
+        decoded(0) := Bool(true)
+      }
+      is(OPC_FPURS) {
+        io.decex.fpuOp.isFpuRd := Bool(true)
+        io.fpuStallTime := UInt(28)
+        io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_DIVSQRT
+        decoded(0) := Bool(true)
+      }
+    }
+  }
+
+  when(opcode === OPCODE_FPU && (opc === OPC_FPUR || opc === OPC_FPUL)) {
+    switch(func) {
+      is(FP_FUNC_ADD, FP_FUNC_SUB, FP_FUNC_MUL) {
+        io.fpuStallTime := UInt(6)
+        io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_MULADD
+      }
+      is(FP_FUNC_DIV) {
+        io.fpuStallTime := UInt(28)
+        io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_DIVSQRT
+      }
+      is(FP_FUNC_SGNJS, FP_FUNC_SGNJNS, FP_FUNC_SGNJXS) {
+        io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_SIGN
+      }
+    }
+  }
+
+  when(opcode === OPCODE_FPC) {
+    io.decex.wrRd(0) := Bool(true)
+    io.decex.fpuOp.isFpuRd := Bool(true)
+    switch(opc) {
+      is(OPC_FPCT) {
+        switch(func) {
+          is(FP_FPCTFUNC_CVTIS) {
+            io.fpuStallTime := UInt(2)
+            io.decex.fpuOp.recodeFromSigned := Bool(true)
+            io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_FLOAT
+          }
+          is(FP_FPCTFUNC_CVTUS) {
+            io.fpuStallTime := UInt(2)
+            io.decex.fpuOp.recodeFromSigned := Bool(false)
+            io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_FLOAT
+          }
+          is(FP_FPCTFUNC_MVIS) {
+            io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_RS1
+          }
+        }  
+        decoded(0) := Bool(true)
+      }
+      is(OPC_FPCF) {
+        switch(func) {
+          is(FP_FPCFFUNC_CVTSI) {
+            io.fpuStallTime := UInt(1)
+            io.decex.fpuOp.recodeToSigned := Bool(true)
+            io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_INT
+            io.decex.fpuOp.overrideRounding := Bool(true)
+          }
+          is(FP_FPCFFUNC_CVTSU) {
+            io.fpuStallTime := UInt(1)
+            io.decex.fpuOp.recodeToSigned := Bool(false)
+            io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_INT
+            io.decex.fpuOp.overrideRounding := Bool(true)
+          }
+          is(FP_FPCFFUNC_MVSI) {
+            io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_RS1
+          }
+          is(FP_FPCFFUNC_CLASS) {
+            io.fpuStallTime := UInt(2)
+            io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_CLASS
+          }
+        }
+        decoded(0) := Bool(true)
+      }
+    }
   }
 
   // Offset for loads/stores
@@ -374,7 +481,7 @@ class Decode() extends Module {
 
   // Disable register write on register 0
   for (i <- 0 until PIPE_COUNT) {
-    when(io.decex.rdAddr(i) === UInt("b00000")) {
+    when(io.decex.rdAddr(i) === UInt("b000000")) {
       io.decex.wrRd(i) := Bool(false)
     }
   }

@@ -21,6 +21,9 @@ class FeDec() extends Bundle() {
   val base = UInt(width = PC_SIZE)
   val reloc = UInt(width = ADDR_WIDTH)
   val relPc = UInt(width = PC_SIZE)
+  val isFloatDst = Bool()
+  val isFloatSrc1 = Bool()
+  val isFloatSrc2 = Bool()
 
   def flush() = {
     // flush only necessary parts of instruction
@@ -28,6 +31,9 @@ class FeDec() extends Bundle() {
     // instr_a(26, 25) := OPCODE_ALUI
     // instr_b(30, 27) := PRED_IFFALSE
     // instr_b(26, 25) := OPCODE_ALUI
+    isFloatDst := Bool(false)
+    isFloatSrc1 := Bool(false)
+    isFloatSrc2 := Bool(false)
     instr_a := UInt(0)
     instr_b := UInt(0)
   }
@@ -50,6 +56,28 @@ class AluOp() extends Bundle() {
     isBCpy := Bool(false)
     isMTS := Bool(false)
     isMFS := Bool(false)
+  }
+}
+
+class FpuOp() extends Bundle() {
+  val func = UInt(width = 4)
+  val isFpuRd = Bool()
+  val isFpuPd = Bool()
+  val recodeFromSigned = Bool()
+  val recodeToSigned = Bool()
+  val overrideRounding = Bool()
+  val isSignaling = Bool()
+  val fpuRdSrc = UInt(width = FPU_RD_WIDTH)
+
+  def defaults() = {
+    func := UInt(0)
+    isFpuRd := Bool(false)
+    isFpuPd := Bool(false)
+    recodeFromSigned := Bool(false)
+    recodeToSigned := Bool(false)
+    overrideRounding := Bool(false)
+    isSignaling := Bool(false)
+    fpuRdSrc := UInt(0)
   }
 }
 
@@ -103,10 +131,14 @@ class DecEx() extends Bundle() {
   val relPc = UInt(width = PC_SIZE)
   val pred =  Vec.fill(PIPE_COUNT) { UInt(width = PRED_BITS+1) }
   val aluOp = Vec.fill(PIPE_COUNT) { new AluOp() }
+  val fpuOp = new FpuOp()
   val predOp = Vec.fill(PIPE_COUNT) { new PredOp() }
   val jmpOp = new JmpOp()
   val memOp = new MemOp()
   val stackOp = UInt(width = SC_OP_BITS)
+
+  val isFloatSrc1 = Bool()
+
 
   // the register fields are very similar to RegFileRead
   // maybe join the structures
@@ -140,6 +172,7 @@ class DecEx() extends Bundle() {
     relPc := UInt(0)
     pred := Vec.fill(PIPE_COUNT) { PRED_IFFALSE }
     aluOp.map(_.defaults())
+    fpuOp.map(_.defaults())
     predOp.map(_.defaults())
     jmpOp.defaults()
     memOp.defaults()
@@ -308,6 +341,7 @@ class DecodeIO() extends Bundle() {
   val decex = new DecEx().asOutput
   val rfWrite =  Vec.fill(PIPE_COUNT) { new Result().asInput }
   val exc = new ExcDec().asInput
+  val fpuStallTime = UInt(width = 6).asOutput
 }
 
 class ExecuteIO() extends Bundle() {
@@ -318,6 +352,7 @@ class ExecuteIO() extends Bundle() {
   val exmem = new ExMem().asOutput
   val exicache = new ExICache().asOutput
   val feex = new FeEx().asInput
+  val fpuDoneNext = Bool().asOutput
   // forwarding inputs
   val exResult = Vec.fill(PIPE_COUNT) { new Result().asInput }
   val memResult = Vec.fill(PIPE_COUNT) { new Result().asInput }
@@ -350,6 +385,8 @@ class MemoryIO() extends Bundle() {
   val exmem = new ExMem().asInput
   val memwb = new MemWb().asOutput
   val memfe = new MemFe().asOutput
+  val fpuStallTime = UInt(width = 6).asInput
+  val fpuDoneNext = Bool().asInput
   // for result forwarding
   val exResult = Vec.fill(PIPE_COUNT) { new Result().asOutput }
   // local and global accesses

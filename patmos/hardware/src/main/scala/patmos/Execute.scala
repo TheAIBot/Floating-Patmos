@@ -11,6 +11,8 @@ package patmos
 import Chisel._
 
 import Constants._
+import hardfloat._
+
 
 class Execute() extends Module {
   val io = IO(new ExecuteIO())
@@ -147,6 +149,8 @@ class Execute() extends Module {
   val excBaseReg = Reg(UInt(width = DATA_WIDTH))
   val excOffReg = Reg(UInt(width = DATA_WIDTH))
 
+  val fcsr = RegInit(UInt(0, width = DATA_WIDTH))
+
   // MS: maybe the multiplication should be in a local component?
 
   // multiplication result registers
@@ -229,6 +233,9 @@ class Execute() extends Module {
           predReg := op(2*i)(PRED_COUNT-1, 0)
           predReg(0) := Bool(true)
         }
+        is(SPEC_FCSR) {
+          fcsr := op(2*i)
+        }
         is(SPEC_SL) {
           mulLoReg := op(2*i)
         }
@@ -260,6 +267,9 @@ class Execute() extends Module {
     switch(exReg.aluOp(i).func) {
       is(SPEC_FL) {
         mfsResult := Cat(UInt(0, DATA_WIDTH-PRED_COUNT), predReg.asUInt()).asUInt()
+      }
+      is(SPEC_FCSR) {
+        mfsResult := fcsr
       }
       is(SPEC_SL) {
         mfsResult := mulLoReg
@@ -294,6 +304,106 @@ class Execute() extends Module {
                                Mux(exReg.aluOp(i).isBCpy, bcpyResult,
                                    aluResult))
   }
+
+
+  //##################
+  //#### FPU land ####
+  //##################
+
+  val roundingMode = Mux(exReg.fpuOp.overrideRounding, consts.round_minMag, fcsr(7, 5))
+  val divSqrtPulseReg = RegInit(Bool(false))
+
+  //
+  //Convert to raw format
+  //
+
+  val fpuPrep = Module(new FPUPrep())
+  fpuPrep.io.rs1In := op(0)
+  fpuPrep.io.rs2In := op(1)
+  fpuPrep.io.recodeFromSigned := exReg.fpuOp.recodeFromSigned
+  fpuPrep.io.roundingMode := roundingMode
+
+  divSqrtPulseReg := exReg.fpuOp.fpuRdSrc === FPU_RD_FROM_DIVSQRT &&
+                     RegNext(io.ena) && 
+                     !io.ena
+                     
+  //
+  // Do computations
+  //
+
+  val fpurl = Module(new FPUrlMulAddSub())
+  fpurl.io.rs1RawF32In := fpuPrep.io.floatRs1RawF32Out
+  fpurl.io.rs2RawF32In := fpuPrep.io.floatRs2RawF32Out
+  fpurl.io.fpuFunc := exReg.fpuOp.func
+  fpurl.io.roundingMode := roundingMode
+
+
+
+  val fpuDivSqrt = Module(new FPUDivSqrt())
+  fpuDivSqrt.io.rs1RawF32In := fpuPrep.io.floatRs1RawF32Out
+  fpuDivSqrt.io.rs2RawF32In := fpuPrep.io.floatRs2RawF32Out
+  fpuDivSqrt.io.inValid := divSqrtPulseReg
+  fpuDivSqrt.io.fpuFunc := exReg.fpuOp.func
+  fpuDivSqrt.io.roundingMode := roundingMode
+  io.fpuDoneNext := RegNext(fpuDivSqrt.io.outValid)
+
+  val fpurSignOps = Module(new FPUrSignOps())
+  fpurSignOps.io.rs1F32In := op(0)
+  fpurSignOps.io.rs2F32In := op(1)
+  fpurSignOps.io.fpuFunc := exReg.fpuOp.func
+
+  val fpuc = Module(new FPUc())
+  fpuc.io.rs1RawF32In := fpuPrep.io.floatRs1RawF32Out
+  fpuc.io.rs2RawF32In := fpuPrep.io.floatRs2RawF32Out
+  fpuc.io.fpuFunc := exReg.fpuOp.func
+  fpuc.io.isSignaling := exReg.fpuOp.isSignaling
+
+  //
+  // Round to RecF32
+  //
+
+  val fpuRound = Module(new FPURound())
+  fpuRound.io.mulAddRawF32 := fpurl.io.mulAddRawF32Out
+  fpuRound.io.mulAddInvalidExc := fpurl.io.invalidExc
+  fpuRound.io.mulAddInfiniteExc := Bool(false)
+  fpuRound.io.divSqrtRawF32 := fpuDivSqrt.io.divSqrtRawF32Out
+  fpuRound.io.divSqrtInvalidExc := fpuDivSqrt.io.invalidExc
+  fpuRound.io.divSqrtInfiniteExc := fpuDivSqrt.io.infiniteExc
+  fpuRound.io.fpuRdSrc := exReg.fpuOp.fpuRdSrc
+  fpuRound.io.roundingMode := roundingMode  
+
+  //
+  // Convert format
+  //
+
+  val fpuFinish = Module(new FPUFinish())
+  fpuFinish.io.rs1F32In := op(0)
+  fpuFinish.io.floatRs1RawF32In := fpuPrep.io.floatRs1RawF32Out
+  fpuFinish.io.intRs1RecF32In := fpuPrep.io.intRs1RecF32Out
+  fpuFinish.io.roundedRecF32In := fpuRound.io.roundedRecF32
+  fpuFinish.io.signF32In := fpurSignOps.io.signF32Out
+  fpuFinish.io.fpuRdSrc := exReg.fpuOp.fpuRdSrc
+  fpuFinish.io.roundingMode := roundingMode
+  fpuFinish.io.recodeToSigned := exReg.fpuOp.recodeToSigned
+  fpuFinish.io.intToF32Exceptions := fpuPrep.io.exceptionFlags
+  fpuFinish.io.roundedRecF32Exceptions := fpuRound.io.exceptionFlags
+
+  when(exReg.fpuOp.isFpuRd && io.ena) {
+    io.exmem.rd(0).addr := exReg.rdAddr(0)
+    io.exmem.rd(0).valid := exReg.wrRd(0) && doExecute(0)
+    io.exmem.rd(0).data := fpuFinish.io.rdOut
+    fcsr := Cat(fcsr(DATA_WIDTH - 1, 5), fcsr(4, 0) | fpuFinish.io.exceptionFlags)
+  }
+
+  when(exReg.fpuOp.isFpuPd && io.ena) {
+    predReg(exReg.predOp(0).dest) := fpuc.io.pd
+    fcsr := Cat(fcsr(DATA_WIDTH - 1, 5), fcsr(4, 0) | fpuc.io.exceptionFlags)
+  }
+
+  //######################
+  //#### End FPU land ####
+  //######################
+
 
   // load/store
   io.exmem.mem.load := exReg.memOp.load && doExecute(0)
@@ -366,6 +476,7 @@ class Execute() extends Module {
   // suppress writes to special registers
   when(!io.ena) {
     predReg := predReg
+    fcsr := fcsr
     mulLoReg := mulLoReg
     mulHiReg := mulHiReg
     retBaseReg := retBaseReg

@@ -22,7 +22,7 @@
   	<Dev DevType="Uart" entity="Uart" iface="OcpCore">
   	  <params>
   		<param name="baudRate" value="115200"/>
-  		<param name="fifoDepth" value="16"/>
+  		<param name="fifoDepth" value="512"/>
   	  </params>
   	</Dev>
   	<Dev DevType="Leds" entity="Leds" iface="OcpCore">

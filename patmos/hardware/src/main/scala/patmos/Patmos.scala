@@ -78,6 +78,10 @@ class PatmosCore(binFile: String, nr: Int, cnt: Int) extends Module {
   execute.io.exResult <> memory.io.exResult
   execute.io.memResult <> writeback.io.memResult
 
+  // FPU stall connections
+  memory.io.fpuStallTime := decode.io.fpuStallTime
+  memory.io.fpuDoneNext := execute.io.fpuDoneNext
+
   // Connect stack cache
   execute.io.exsc <> dcache.io.scIO.exsc
   dcache.io.scIO.scex <> execute.io.scex

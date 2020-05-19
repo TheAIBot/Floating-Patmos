@@ -51,6 +51,9 @@ namespace patmos
   /// Definition of a basic data value in Patmos.
   typedef int32_t word_t;
 
+  /// Definition of a basic  floating point value in Patmos.
+  typedef float single_t;
+
   /// Definition of an unsigned basic data value in Patmos.
   typedef uint32_t uword_t;
 

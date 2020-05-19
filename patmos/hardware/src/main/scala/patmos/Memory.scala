@@ -34,16 +34,20 @@ class Memory() extends Module {
   io.flush := flush
 
   // Stall logic
+  val fpuStall = RegInit(UInt(0, 6))
   val mayStallReg = RegInit(Bool(false))
   val enable = (io.localInOut.S.Resp === OcpResp.DVA
                 || io.globalInOut.S.Resp === OcpResp.DVA
-                || !mayStallReg)
+                || !mayStallReg) && fpuStall === UInt(0)
   io.ena_out := enable
+
+  fpuStall := Mux(fpuStall === UInt(0) || io.fpuDoneNext, UInt(0), fpuStall - UInt(1))
 
   // Register from execution stage
   when(enable && io.ena_in) {
     memReg := io.exmem
     mayStallReg := io.exmem.mem.load || io.exmem.mem.store
+    fpuStall := io.fpuStallTime
     when(flush) {
       memReg.flush()
       mayStallReg := Bool(false)
