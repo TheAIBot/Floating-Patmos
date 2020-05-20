@@ -253,9 +253,9 @@ void makeALUbTest(std::string instrName, std::function<int32_t(int32_t, int32_t,
 			for (size_t z = 0; z < predValues.size(); z++)
 			{
 				test.setGPReg("r1", valuesA[x]);
-				test.setPred("p2", predValues[y]);
+				test.setPred("p2", predValues[z]);
 				test.addInstr(instrName + " r3 = r1, " + std::to_string(immValues[y]) + ", p2");
-				test.expectRegisterValue("r3", op(valuesA[x], immValues[y], predValues[y]));
+				test.expectRegisterValue("r3", op(valuesA[x], immValues[y], predValues[z]));
 			}
 		}
 	}
