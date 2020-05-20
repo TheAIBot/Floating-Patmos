@@ -67,7 +67,7 @@ start:  nop
 	{
 		if (true || std::isnan(value) || std::isinf(value) || std::fpclassify(value) == FP_SUBNORMAL)
 		{
-			addInstr("addl r23 = r0, " + std::to_string(reinterpret_cast<uint32_t&>(value)));
+			addInstr("addl r23 = r0, " + std::to_string(reinterpret_cast<uint32_t&>(value)) + " # " + std::to_string(value));
 			addInstr("fmvis " + reg + " = r23");
 		}
 		else
