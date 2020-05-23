@@ -232,135 +232,6 @@ mulRes UnsignMul(uint32_t a, uint32_t b)
 }
 
 
-struct regInfo
-{
-	std::string regName;
-	int32_t regIndex;
-	bool isReadonly;
-
-	regInfo(std::string name, int32_t index, bool isReadonly = false) : regName(name), regIndex(index), isReadonly(isReadonly)
-	{}
-
-	std::string getBaseName()
-	{
-		return regName[0] + std::to_string(regIndex);
-	}
-};
-
-std::vector<regInfo> GPRs = {
-	regInfo("r0", 0, true),
-	regInfo("r1", 1),
-	regInfo("r2", 2),
-	regInfo("r3", 3),
-	regInfo("r4", 4),
-	regInfo("r5", 5),
-	regInfo("r6", 6),
-	regInfo("r7", 7),
-	regInfo("r8", 8),
-	regInfo("r9", 9),
-	regInfo("r10", 10),
-	regInfo("r11", 11),
-	regInfo("r12", 12),
-	regInfo("r13", 13),
-	regInfo("r14", 14),
-	regInfo("r15", 15),
-	regInfo("r16", 16),
-	regInfo("r17", 17),
-	regInfo("r18", 18),
-	regInfo("r19", 19),
-	regInfo("r20", 20),
-	regInfo("r21", 21),
-	regInfo("r22", 22),
-	regInfo("r23", 23),
-	regInfo("r24", 24),
-	regInfo("r25", 25),
-	regInfo("r26", 26),
-	regInfo("r27", 27),
-	regInfo("r28", 28),
-	regInfo("r29", 29),
-	regInfo("r30", 30),
-	regInfo("r31", 31)
-};
-
-std::vector<regInfo> FPRs = {
-	regInfo("f0", 0),
-	regInfo("f1", 1),
-	regInfo("f2", 2),
-	regInfo("f3", 3),
-	regInfo("f4", 4),
-	regInfo("f5", 5),
-	regInfo("f6", 6),
-	regInfo("f7", 7),
-	regInfo("f8", 8),
-	regInfo("f9", 9),
-	regInfo("f10", 10),
-	regInfo("f11", 11),
-	regInfo("f12", 12),
-	regInfo("f13", 13),
-	regInfo("f14", 14),
-	regInfo("f15", 15),
-	regInfo("f16", 16),
-	regInfo("f17", 17),
-	regInfo("f18", 18),
-	regInfo("f19", 19),
-	regInfo("f20", 20),
-	regInfo("f21", 21),
-	regInfo("f22", 22),
-	regInfo("f23", 23),
-	regInfo("f24", 24),
-	regInfo("f25", 25),
-	regInfo("f26", 26),
-	regInfo("f27", 27),
-	regInfo("f28", 28),
-	regInfo("f29", 29),
-	regInfo("f30", 30),
-	regInfo("f31", 31)
-};
-
-std::vector<regInfo> PRs = {
-	regInfo("p0", 0, true),
-	regInfo("p1", 1),
-	regInfo("p2", 2),
-	regInfo("p3", 3),
-	regInfo("p4", 4),
-	regInfo("p5", 5),
-	regInfo("p6", 6),
-	regInfo("p7", 7)
-};
-
-std::vector<regInfo> SPRs = {
-	regInfo("s0", 0),
-	regInfo("s1", 1),
-	regInfo("sfcsr", 1),
-	regInfo("s2", 2),
-	regInfo("sl", 2),
-	regInfo("s3", 3),
-	regInfo("sh", 3),
-	regInfo("s4", 4),
-	regInfo("s5", 5),
-	regInfo("ss", 5),
-	regInfo("s6", 6),
-	regInfo("st", 6),
-	regInfo("s7", 7),
-	regInfo("srb", 7),
-	regInfo("s8", 8),
-	regInfo("sro", 8),
-	regInfo("s9", 9),
-	regInfo("sxb", 9),
-	regInfo("s10", 10),
-	regInfo("sxo", 10),
-	regInfo("s11", 11),
-	regInfo("s12", 12),
-	regInfo("s13", 13),
-	regInfo("s14", 14),
-	regInfo("s15", 15)
-};
-
-regInfo getRandomReg(std::mt19937& rngGen, std::vector<regInfo>& regSrc)
-{
-	std::uniform_int_distribution<int32_t> distribution(0, regSrc.size() - 1);
-	return regSrc[distribution(rngGen)];
-}
 
 enum class opSrc {
 	RegSrcInt, 
@@ -383,15 +254,15 @@ class opSource
 {
 private:
 	opSrc src;
-	std::vector<regInfo>* regSrc;
+	const std::vector<regInfo>* regSrc;
 	valueRange<int32_t> intRange;
 	valueRange<float> floatRange;
 
 public:
-	opSource(std::vector<regInfo>& regSrc, valueRange<int32_t> intRange) : src(opSrc::RegSrcInt), regSrc(&regSrc), intRange(intRange), floatRange(valueRange<float>(0, 0))
+	opSource(const std::vector<regInfo>& regSrc, valueRange<int32_t> intRange) : src(opSrc::RegSrcInt), regSrc(&regSrc), intRange(intRange), floatRange(valueRange<float>(0, 0))
 	{ }
 
-	opSource(std::vector<regInfo>& regSrc, valueRange<float> floatRange) : src(opSrc::RegSrcFloat), regSrc(&regSrc), intRange(valueRange<int32_t>(0, 0)), floatRange(floatRange)
+	opSource(const std::vector<regInfo>& regSrc, valueRange<float> floatRange) : src(opSrc::RegSrcFloat), regSrc(&regSrc), intRange(valueRange<int32_t>(0, 0)), floatRange(floatRange)
 	{ }
 
 	opSource(valueRange<int32_t> intRange) : src(opSrc::IntImm), regSrc(nullptr), intRange(intRange), floatRange(valueRange<float>(0, 0))
@@ -467,7 +338,7 @@ template<typename FRet, typename... TArgs>
 class uni_format : public baseFormat
 {
 protected:
-	std::vector<regInfo>& destRegs;
+	const std::vector<regInfo>& destRegs;
 	std::array<opSource, sizeof...(TArgs)> sources;
 	std::function<FRet(typename TArgs::regValueT...)> func;
 
@@ -530,7 +401,7 @@ protected:
 	}
 
 public:
-	uni_format(std::string name, Pipes pipe, std::vector<regInfo>& destRegs, typename TArgs::srcType... srcs, std::function<FRet(typename TArgs::regValueT...)> func) : baseFormat(name, pipe), destRegs(destRegs), sources({ {srcs...} }), func(func)
+	uni_format(std::string name, Pipes pipe, const std::vector<regInfo>& destRegs, typename TArgs::srcType... srcs, std::function<FRet(typename TArgs::regValueT...)> func) : baseFormat(name, pipe), destRegs(destRegs), sources({ {srcs...} }), func(func)
 	{}
 
 	void makeTests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const override
@@ -553,14 +424,14 @@ public:
 };
 
 valueRange<int32_t> wholeIntRange(std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max());
-opSource gprWholeIntRange(GPRs, wholeIntRange);
+opSource gprWholeIntRange(registers::GPRs, wholeIntRange);
 
 
 class ALUr_format : public uni_format<int32_t, sourceData<true, int32_t>, sourceData<true, int32_t>>
 {
 public:
 	ALUr_format(std::string name, std::function<int32_t(int32_t, int32_t)> func) : uni_format(
-		name, Pipes::Both, GPRs,
+		name, Pipes::Both, registers::GPRs,
 		gprWholeIntRange,
 		gprWholeIntRange,
 		func)
@@ -571,7 +442,7 @@ class ALUi_format : public uni_format<int32_t, sourceData<true, int32_t>, source
 {
 public:
 	ALUi_format(std::string name, std::function<int32_t(int32_t, int32_t)> func) : uni_format(
-		name, Pipes::Both, GPRs, 
+		name, Pipes::Both, registers::GPRs,
 		gprWholeIntRange,
 		opSource(valueRange<int32_t>(0, (1 << 12) - 1)), 
 		func)
@@ -582,7 +453,7 @@ class ALUl_format : public uni_format<int32_t, sourceData<true, int32_t>, source
 {
 public:
 	ALUl_format(std::string name, std::function<int32_t(int32_t, int32_t)> func) : uni_format(
-		name, Pipes::First, GPRs,
+		name, Pipes::First, registers::GPRs,
 		gprWholeIntRange,
 		opSource(wholeIntRange),
 		func)
@@ -593,7 +464,7 @@ class ALUm_format : public uni_format<mulRes, sourceData<true, int32_t>, sourceD
 {
 public:
 	ALUm_format(std::string name, std::function<mulRes(uint32_t, uint32_t)> func) : uni_format(
-		name, Pipes::First, GPRs,
+		name, Pipes::First, registers::GPRs,
 		gprWholeIntRange,
 		gprWholeIntRange,
 		func)
@@ -623,7 +494,7 @@ class ALUc_format : public uni_format<bool, sourceData<true, int32_t>, sourceDat
 {
 public:
 	ALUc_format(std::string name, std::function<bool(int32_t, int32_t)> func) : uni_format(
-		name, Pipes::Both, PRs,
+		name, Pipes::Both, registers::PRs,
 		gprWholeIntRange,
 		gprWholeIntRange,
 		func)
@@ -634,7 +505,7 @@ class ALUci_format : public uni_format<bool, sourceData<true, int32_t>, sourceDa
 {
 public:
 	ALUci_format(std::string name, std::function<bool(int32_t, int32_t)> func) : uni_format(
-		name, Pipes::Both, PRs,
+		name, Pipes::Both, registers::PRs,
 		gprWholeIntRange,
 		opSource(valueRange<int32_t>(0, (1 << 5) - 1)),
 		func)
@@ -645,9 +516,9 @@ class ALUp_format : public uni_format<bool, sourceData<true, bool>, sourceData<t
 {
 public:
 	ALUp_format(std::string name, std::function<bool(bool, bool)> func) : uni_format(
-		name, Pipes::Both, PRs,
-		opSource(PRs, valueRange<int32_t>(0, 1)),
-		opSource(PRs, valueRange<int32_t>(0, 1)),
+		name, Pipes::Both, registers::PRs,
+		opSource(registers::PRs, valueRange<int32_t>(0, 1)),
+		opSource(registers::PRs, valueRange<int32_t>(0, 1)),
 		func)
 	{}
 };
@@ -656,10 +527,10 @@ class ALUb_format : public uni_format<int32_t, sourceData<true, int32_t>, source
 {
 public:
 	ALUb_format(std::string name, std::function<int32_t(int32_t, int32_t, bool)> func) : uni_format(
-		name, Pipes::Both, GPRs,
+		name, Pipes::Both, registers::GPRs,
 		gprWholeIntRange,
 		opSource(valueRange<int32_t>(0, (1 << 5) - 1)),
-		opSource(PRs, valueRange<int32_t>(0, 1)),
+		opSource(registers::PRs, valueRange<int32_t>(0, 1)),
 		func)
 	{}
 };
@@ -668,7 +539,7 @@ class SPCt_format : public uni_format<int32_t, sourceData<true, int32_t>>
 {
 public:
 	SPCt_format(std::string name) : uni_format(
-		name, Pipes::Both, SPRs,
+		name, Pipes::Both, registers::SPRs,
 		gprWholeIntRange,
 		[](int32_t a) { return a; })
 	{}
@@ -678,8 +549,8 @@ class SPCf_format : public uni_format<int32_t, sourceData<true, int32_t>>
 {
 public:
 	SPCf_format(std::string name) : uni_format(
-		name, Pipes::Both, GPRs,
-		opSource(SPRs, wholeIntRange),
+		name, Pipes::Both, registers::GPRs,
+		opSource(registers::SPRs, wholeIntRange),
 		[](int32_t a) { return a; })
 	{}
 };
