@@ -482,28 +482,16 @@ private:
 	std::function<TFV> func;
 
 	template<typename T>
-	T nanitf(const opSource& aa, std::mt19937& rngGen)
-	{
-		return aa.getRandom<T>(rngGen);
-	}
-
-public:
-	uni_format(std::string name, Pipes pipe, std::vector<regInfo>& destRegs, typename TArgs::srcType... srcs, std::function<TFV> func) : baseFormat(name, pipe), destRegs(destRegs), sources(std::make_tuple(srcs...)), func(func)
-	{}
-
-	template<typename T1, typename T2>
-	bool cake() const
-	{
-		return std::is_same<T1, T2>::value;
-	}
-
-	template<typename T>
 	regInfo setAndReturnRegister(isaTest& test, const opSource& src, T value, std::mt19937& rngGen) const
 	{
 		regInfo rndReg = src.getRandomRegister(rngGen);
 		test.setRegister(rndReg.regName, value);
 		return rndReg;
 	}
+
+public:
+	uni_format(std::string name, Pipes pipe, std::vector<regInfo>& destRegs, typename TArgs::srcType... srcs, std::function<TFV> func) : baseFormat(name, pipe), destRegs(destRegs), sources(std::make_tuple(srcs...)), func(func)
+	{}
 
 	void makeTests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const override
 	{
@@ -513,25 +501,21 @@ public:
 
 			regInfo destReg = getRandomReg(rngGen, destRegs);
 
-			constexpr std::tuple<typename TArgs::regValueT...> regTypes;
-			constexpr std::tuple<typename TArgs::isFromReg...> isFromRegs;
 			auto regValues = std::apply([&](const auto&... src) {
-				return std::apply([&](const auto... src2) {
-					return std::tuple(nanitf<std::remove_const<decltype(src2)>::type>(src, rngGen)...);
-					}, regTypes);
+				return std::make_tuple(src.getRandom<TArgs::regValueT>(rngGen)...);
 				}, sources);
 
-			auto fish = std::make_tuple(cake<fromRegister<true>, typename TArgs::isFromReg>()...);
+			auto usesReg = std::make_tuple(std::is_same<fromRegister<true>, typename TArgs::isFromReg>::value...);
 
 			std::vector<std::string> srcStrs = std::apply([&](const auto&... src) {
-				return std::apply([&](const auto&... src2) {
-					return std::apply([&](const auto&... src3) {
+				return std::apply([&](const auto&... fromReg) {
+					return std::apply([&](const auto&... value) {
 						std::vector<std::string> strs = {
-							{(src2 ? setAndReturnRegister(test, src, src3, rngGen).regName : std::to_string(src3))...}
+							{(fromReg ? setAndReturnRegister(test, src, value, rngGen).regName : std::to_string(value))...}
 						};
 						return strs;
 						}, regValues);
-					}, fish);
+					}, usesReg);
 				}, sources);
 
 			std::string instr = instrName + " " + destReg.regName + " = ";
