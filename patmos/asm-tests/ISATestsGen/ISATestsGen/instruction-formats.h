@@ -1,10 +1,12 @@
 #pragma once
 
 #include "common.h"
+#include "float-csr.h"
 #include <string>
 #include <array>
 #include <tuple>
 #include <cstdint>
+#include <stdexcept>
 
 class opSource
 {
@@ -76,7 +78,7 @@ struct sourceData
 	using regValueT = regValueType;
 };
 
-template<typename FRet, typename... TArgs>
+template<typename FRet, bool useMakeTests, typename... TArgs>
 class uni_format : public baseFormat
 {
 protected:
@@ -148,7 +150,7 @@ public:
 
 	void makeTests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const override
 	{
-		if constexpr (std::is_fundamental<FRet>::value)
+		if constexpr (useMakeTests)
 		{
 			for (size_t i = 0; i < testCount; i++)
 			{
@@ -162,14 +164,18 @@ public:
 				test.close();
 			}
 		}
+		else
+		{
+			throw std::runtime_error("Expected method to be overwritten but it was still called.");
+		}
 	}
 };
 
-valueRange<int32_t> wholeIntRange(std::numeric_limits<int32_t>::min(), std::numeric_limits<int32_t>::max());
-opSource gprWholeIntRange(registers::GPRs, wholeIntRange);
+static valueRange<int32_t> wholeIntRange(std::numeric_limits<int32_t>::lowest(), std::numeric_limits<int32_t>::max());
+static opSource gprWholeIntRange(registers::GPRs, wholeIntRange);
 
 
-class ALUr_format : public uni_format<int32_t, sourceData<true, int32_t>, sourceData<true, int32_t>>
+class ALUr_format : public uni_format<int32_t, true, sourceData<true, int32_t>, sourceData<true, int32_t>>
 {
 public:
 	ALUr_format(std::string name, std::function<int32_t(int32_t, int32_t)> func) : uni_format(
@@ -180,7 +186,7 @@ public:
 	{}
 };
 
-class ALUi_format : public uni_format<int32_t, sourceData<true, int32_t>, sourceData<false, int32_t>>
+class ALUi_format : public uni_format<int32_t, true, sourceData<true, int32_t>, sourceData<false, int32_t>>
 {
 public:
 	ALUi_format(std::string name, std::function<int32_t(int32_t, int32_t)> func) : uni_format(
@@ -191,7 +197,7 @@ public:
 	{}
 };
 
-class ALUl_format : public uni_format<int32_t, sourceData<true, int32_t>, sourceData<false, int32_t>>
+class ALUl_format : public uni_format<int32_t, true, sourceData<true, int32_t>, sourceData<false, int32_t>>
 {
 public:
 	ALUl_format(std::string name, std::function<int32_t(int32_t, int32_t)> func) : uni_format(
@@ -202,7 +208,7 @@ public:
 	{}
 };
 
-class ALUm_format : public uni_format<mulRes, sourceData<true, int32_t>, sourceData<true, int32_t>>
+class ALUm_format : public uni_format<mulRes, false, sourceData<true, int32_t>, sourceData<true, int32_t>>
 {
 public:
 	ALUm_format(std::string name, std::function<mulRes(uint32_t, uint32_t)> func) : uni_format(
@@ -232,7 +238,7 @@ public:
 	}
 };
 
-class ALUc_format : public uni_format<bool, sourceData<true, int32_t>, sourceData<true, int32_t>>
+class ALUc_format : public uni_format<bool, true, sourceData<true, int32_t>, sourceData<true, int32_t>>
 {
 public:
 	ALUc_format(std::string name, std::function<bool(int32_t, int32_t)> func) : uni_format(
@@ -243,7 +249,7 @@ public:
 	{}
 };
 
-class ALUci_format : public uni_format<bool, sourceData<true, int32_t>, sourceData<false, int32_t>>
+class ALUci_format : public uni_format<bool, true, sourceData<true, int32_t>, sourceData<false, int32_t>>
 {
 public:
 	ALUci_format(std::string name, std::function<bool(int32_t, int32_t)> func) : uni_format(
@@ -254,7 +260,7 @@ public:
 	{}
 };
 
-class ALUp_format : public uni_format<bool, sourceData<true, bool>, sourceData<true, bool>>
+class ALUp_format : public uni_format<bool, true, sourceData<true, bool>, sourceData<true, bool>>
 {
 public:
 	ALUp_format(std::string name, std::function<bool(bool, bool)> func) : uni_format(
@@ -265,7 +271,7 @@ public:
 	{}
 };
 
-class ALUb_format : public uni_format<int32_t, sourceData<true, int32_t>, sourceData<false, int32_t>, sourceData<true, bool>>
+class ALUb_format : public uni_format<int32_t, true, sourceData<true, int32_t>, sourceData<false, int32_t>, sourceData<true, bool>>
 {
 public:
 	ALUb_format(std::string name, std::function<int32_t(int32_t, int32_t, bool)> func) : uni_format(
@@ -277,7 +283,7 @@ public:
 	{}
 };
 
-class SPCt_format : public uni_format<int32_t, sourceData<true, int32_t>>
+class SPCt_format : public uni_format<int32_t, true, sourceData<true, int32_t>>
 {
 public:
 	SPCt_format(std::string name) : uni_format(
@@ -287,12 +293,174 @@ public:
 	{}
 };
 
-class SPCf_format : public uni_format<int32_t, sourceData<true, int32_t>>
+class SPCf_format : public uni_format<int32_t, true, sourceData<true, int32_t>>
 {
 public:
 	SPCf_format(std::string name) : uni_format(
 		name, Pipes::Both, registers::GPRs,
 		opSource(registers::SPRs, wholeIntRange),
 		[](int32_t a) { return a; })
+	{}
+};
+
+
+
+template<typename FRet, bool useMakeTests, typename... TArgs>
+class uni_float_format : public uni_format<FRet, false, TArgs...>
+{
+private:
+	const std::vector<rounding::x86_round_mode>& rounding_modes;
+
+public:
+	uni_float_format(std::string name, const std::vector<regInfo>& destRegs, typename TArgs::srcType... srcs, std::function<FRet(typename TArgs::regValueT...)> func, const std::vector<rounding::x86_round_mode>& rounding_modes) :
+		uni_format(name, Pipes::First, destRegs, srcs..., func), rounding_modes(rounding_modes)
+	{}
+
+	void makeTests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const override
+	{
+		if constexpr (useMakeTests)
+		{
+			for each (auto x86_round in rounding_modes)
+			{
+				rounding::patmos_round_mode patmos_round = rounding::x86_to_patmos_round(x86_round);
+
+				for (size_t i = 0; i < testCount; i++)
+				{
+					isaTest test(asmfilepath, expfilepath, instrName + "-" + rounding::patmos_round_to_string(patmos_round) + "-" + std::to_string(i));
+
+					testData tData = setRegistersAndGetInstrData(test, rngGen);
+
+					test.addInstr("mts sfcsr = " + std::to_string(static_cast<int32_t>(patmos_round) << 5) + " # clear exceptions and set rounding mode to " + rounding::patmos_round_to_string(patmos_round));
+					test.addInstr(tData.instr);
+
+					std::fenv_t curr_fenv;
+					if (fegetenv(&curr_fenv) != 0)
+					{
+						std::runtime_error("Failed to store the current floating-point environment.");
+					}
+					if (fesetround((int32_t)x86_round) != 0)
+					{
+						std::runtime_error("Failed to set the floating-point rounding mode.");
+					}
+					if (feclearexcept(FE_ALL_EXCEPT) != 0)
+					{
+						std::runtime_error("Failed to clear the floating-point exceptions.");
+					}
+
+					FRet result = std::apply(func, tData.sourceValues);
+					int32_t exceptions = fetestexcept(FE_ALL_EXCEPT);
+
+					if (fesetenv(&curr_fenv) != 0)
+					{
+						std::runtime_error("Failed to restore the floating-point environment.");
+					}
+
+					test.expectRegisterValue(tData.destReg.regName, result);
+					test.expectRegisterValue("sfcsr", exceptions);
+
+					test.close();
+				}
+			}
+		}
+		else
+		{
+			throw std::runtime_error("Expected method to be overwritten but it was still called.");
+		}
+	}
+};
+
+
+
+static const std::vector<rounding::x86_round_mode> x86_and_patmos_compat_rounding_modes = {
+	rounding::x86_round_mode::RNE,
+	rounding::x86_round_mode::RTZ,
+	rounding::x86_round_mode::RDN,
+	rounding::x86_round_mode::RUP,
+};
+static valueRange<float> floatRange1000(-1000.0f, 1000.0f);
+static opSource fprWholeFloatRange(registers::FPRs, floatRange1000);
+static const std::vector<std::function<void(isaTest&)>> no_special_tests;
+
+
+
+class FPUr_format : public uni_float_format<float, true, sourceData<true, float>, sourceData<true, float>>
+{
+public:
+	FPUr_format(std::string name, std::function<float(float, float)> func) : uni_float_format(
+		name, registers::FPRs,
+		fprWholeFloatRange,
+		fprWholeFloatRange,
+		func,
+		x86_and_patmos_compat_rounding_modes)
+	{}
+};
+
+class FPUl_format : public uni_float_format<float, true, sourceData<true, float>, sourceData<false, float>>
+{
+public:
+	FPUl_format(std::string name, std::function<float(float, float)> func) : uni_float_format(
+		name, registers::FPRs,
+		fprWholeFloatRange,
+		opSource(floatRange1000),
+		func,
+		x86_and_patmos_compat_rounding_modes)
+	{}
+};
+
+class FPUrs_format : public uni_float_format<float, true, sourceData<true, float>>
+{
+public:
+	FPUrs_format(std::string name, std::function<float(float)> func) : uni_float_format(
+		name, registers::FPRs,
+		fprWholeFloatRange,
+		func,
+		x86_and_patmos_compat_rounding_modes)
+	{}
+};
+
+class FPCt_format : public uni_float_format<float, true, sourceData<true, int32_t>>
+{
+public:
+	FPCt_format(std::string name, std::function<float(int32_t)> func) : uni_float_format(
+		name, registers::FPRs,
+		gprWholeIntRange,
+		func,
+		x86_and_patmos_compat_rounding_modes)
+	{}
+};
+
+class FPCf_format : public uni_float_format<int32_t, true, sourceData<true, float>>
+{
+	const std::vector<std::function<void(isaTest&)>> special_tests;
+
+public:
+	FPCf_format(std::string name, std::function<int32_t(float)> func, const std::vector<std::function<void(isaTest&)>>& special_tests = no_special_tests, const std::vector<rounding::x86_round_mode>& rounding_modes = x86_and_patmos_compat_rounding_modes) : uni_float_format(
+		name, registers::GPRs,
+		fprWholeFloatRange,
+		func,
+		rounding_modes), special_tests(special_tests)
+	{}
+
+	void makeTests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const override
+	{
+		uni_float_format::makeTests(asmfilepath, expfilepath, rngGen, testCount);
+
+		for (size_t i = 0; i < special_tests.size(); i++)
+		{
+			isaTest test(asmfilepath, expfilepath, instrName + "-" + std::to_string(i + testCount));
+			special_tests[i](test);
+		}
+	}
+};
+
+class FPUc_format : public uni_float_format<bool, true, sourceData<true, float>, sourceData<true, float>>
+{
+public:
+	FPUc_format(std::string name, std::function<bool(float, float)> func) : uni_float_format(
+		name, registers::PRs,
+		fprWholeFloatRange,
+		fprWholeFloatRange,
+		func,
+		x86_and_patmos_compat_rounding_modes)
 	{}
 };
