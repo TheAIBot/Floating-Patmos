@@ -4,5 +4,7 @@
 #pragma once
 
 #include "register.h"
+#include "tester.h"
+#include "instruction-formats.h"
 
 // TODO: Reference additional headers your program requires here.
