@@ -432,16 +432,6 @@ public:
 	}
 };
 
-
-/*
-	name,
-	pipe,
-	predReg,
-	destReg,
-	sources {},
-	operationFunc
-*/
-
 enum class Pipes
 {
 	First,
@@ -473,65 +463,91 @@ struct sourceData
 	using regValueT = regValueType;
 };
 
-template<typename TFV, typename... TArgs>
+template<typename FRet, typename... TArgs>
 class uni_format : public baseFormat
 {
-private:
+protected:
 	std::vector<regInfo>& destRegs;
-	std::tuple<typename TArgs::srcType...> sources;
-	std::function<TFV> func;
+	std::array<opSource, sizeof...(TArgs)> sources;
+	std::function<FRet(typename TArgs::regValueT...)> func;
 
-	template<typename T>
-	regInfo setAndReturnRegister(isaTest& test, const opSource& src, T value, std::mt19937& rngGen) const
+	template<std::size_t I, typename VType, typename UseReg>
+	std::string setRegAndGetsourceAsString(isaTest& test, std::mt19937& rngGen, std::tuple<typename TArgs::regValueT...>& sourceValues) const
 	{
-		regInfo rndReg = src.getRandomRegister(rngGen);
-		test.setRegister(rndReg.regName, value);
-		return rndReg;
+		VType value = std::get<I>(sourceValues);
+		if constexpr (std::is_same<fromRegister<true>, UseReg>::value)
+		{
+			const opSource& src = std::get<I>(sources);
+
+			regInfo rndReg = src.getRandomRegister(rngGen);
+			test.setRegister(rndReg.regName, value);
+			return rndReg.regName;
+		}
+		else
+		{
+			return std::to_string(value);
+		}
+	}
+
+	template<std::size_t... Is>
+	std::vector<std::string> setRegsAndGetSourcesAsStrings(isaTest& test, std::mt19937& rngGen, std::tuple<typename TArgs::regValueT...>& sourceValues, std::index_sequence<Is...> sdf) const
+	{
+		std::vector<std::string> srcStrs;
+		(srcStrs.push_back(setRegAndGetsourceAsString<Is, typename TArgs::regValueT, typename TArgs::isFromReg>(test, rngGen, sourceValues)), ...);
+		return srcStrs;
+	}
+
+	struct testData
+	{
+		regInfo destReg;
+		std::tuple<typename TArgs::regValueT...> sourceValues;
+		std::string instr;
+
+		testData() : destReg(regInfo("", 0)), sourceValues(std::tuple<typename TArgs::regValueT...>()), instr("")
+		{ }
+	};
+
+	testData setRegistersAndGetInstrData(isaTest& test, std::mt19937& rngGen) const
+	{
+		testData tData;
+
+		tData.destReg = getRandomReg(rngGen, destRegs);
+
+		tData.sourceValues = std::apply([&](const auto&... src) {
+			return std::make_tuple(src.getRandom<TArgs::regValueT>(rngGen)...);
+			}, sources);
+
+		std::vector<std::string> srcStrs = setRegsAndGetSourcesAsStrings(test, rngGen, tData.sourceValues, std::make_index_sequence<sizeof...(TArgs)>());
+
+		tData.instr = instrName + " " + tData.destReg.regName + " = ";
+		for (size_t i = 0; i < srcStrs.size() - 1; i++)
+		{
+			tData.instr += srcStrs[i] + ", ";
+		}
+		tData.instr += srcStrs[srcStrs.size() - 1];
+
+		return tData;
 	}
 
 public:
-	uni_format(std::string name, Pipes pipe, std::vector<regInfo>& destRegs, typename TArgs::srcType... srcs, std::function<TFV> func) : baseFormat(name, pipe), destRegs(destRegs), sources(std::make_tuple(srcs...)), func(func)
+	uni_format(std::string name, Pipes pipe, std::vector<regInfo>& destRegs, typename TArgs::srcType... srcs, std::function<FRet(typename TArgs::regValueT...)> func) : baseFormat(name, pipe), destRegs(destRegs), sources({ {srcs...} }), func(func)
 	{}
 
 	void makeTests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const override
 	{
-		for (size_t i = 0; i < testCount; i++)
+		if constexpr (std::is_fundamental<FRet>::value)
 		{
-			isaTest test(asmfilepath, expfilepath, instrName + "-" + std::to_string(i));
-
-			regInfo destReg = getRandomReg(rngGen, destRegs);
-
-			auto regValues = std::apply([&](const auto&... src) {
-				return std::make_tuple(src.getRandom<TArgs::regValueT>(rngGen)...);
-				}, sources);
-
-			auto usesReg = std::make_tuple(std::is_same<fromRegister<true>, typename TArgs::isFromReg>::value...);
-
-			std::vector<std::string> srcStrs = std::apply([&](const auto&... src) {
-				return std::apply([&](const auto&... fromReg) {
-					return std::apply([&](const auto&... value) {
-						std::vector<std::string> strs = {
-							{(fromReg ? setAndReturnRegister(test, src, value, rngGen).regName : std::to_string(value))...}
-						};
-						return strs;
-						}, regValues);
-					}, usesReg);
-				}, sources);
-
-			std::string instr = instrName + " " + destReg.regName + " = ";
-			for (size_t i = 0; i < srcStrs.size(); i++)
+			for (size_t i = 0; i < testCount; i++)
 			{
-				instr += srcStrs[i];
-				if (i != srcStrs.size() - 1)
-				{
-					instr += ", ";
-				}
+				isaTest test(asmfilepath, expfilepath, instrName + "-" + std::to_string(i));
+
+				testData tData = setRegistersAndGetInstrData(test, rngGen);
+
+				test.addInstr(tData.instr);
+				test.expectRegisterValue(tData.destReg.regName, std::apply(func, tData.sourceValues));
+
+				test.close();
 			}
-
-			test.addInstr(instr);
-			test.expectRegisterValue(destReg.regName, std::apply(func, regValues));
-
-			test.close();
 		}
 	}
 };
@@ -540,7 +556,7 @@ valueRange<int32_t> wholeIntRange(std::numeric_limits<int32_t>::min(), std::nume
 opSource gprWholeIntRange(GPRs, wholeIntRange);
 
 
-class ALUr_format : public uni_format<int32_t(int32_t, int32_t), sourceData<true, int32_t>, sourceData<true, int32_t>>
+class ALUr_format : public uni_format<int32_t, sourceData<true, int32_t>, sourceData<true, int32_t>>
 {
 public:
 	ALUr_format(std::string name, std::function<int32_t(int32_t, int32_t)> func) : uni_format(
@@ -551,7 +567,7 @@ public:
 	{}
 };
 
-class ALUi_format : public uni_format<int32_t(int32_t, int32_t), sourceData<true, int32_t>, sourceData<false, int32_t>>
+class ALUi_format : public uni_format<int32_t, sourceData<true, int32_t>, sourceData<false, int32_t>>
 {
 public:
 	ALUi_format(std::string name, std::function<int32_t(int32_t, int32_t)> func) : uni_format(
@@ -562,7 +578,7 @@ public:
 	{}
 };
 
-class ALUl_format : public uni_format<int32_t(int32_t, int32_t), sourceData<true, int32_t>, sourceData<false, int32_t>>
+class ALUl_format : public uni_format<int32_t, sourceData<true, int32_t>, sourceData<false, int32_t>>
 {
 public:
 	ALUl_format(std::string name, std::function<int32_t(int32_t, int32_t)> func) : uni_format(
@@ -573,13 +589,14 @@ public:
 	{}
 };
 
-class ALUm_format : public baseFormat
+class ALUm_format : public uni_format<mulRes, sourceData<true, int32_t>, sourceData<true, int32_t>>
 {
-private:
-	std::function<mulRes(uint32_t, uint32_t)> func;
-
 public:
-	ALUm_format(std::string name, std::function<mulRes(uint32_t, uint32_t)> func) : baseFormat(name, Pipes::First), func(func)
+	ALUm_format(std::string name, std::function<mulRes(uint32_t, uint32_t)> func) : uni_format(
+		name, Pipes::First, GPRs,
+		gprWholeIntRange,
+		gprWholeIntRange,
+		func)
 	{}
 
 	void makeTests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const override
@@ -588,30 +605,21 @@ public:
 		{
 			isaTest test(asmfilepath, expfilepath, instrName + "-" + std::to_string(i));
 
-			regInfo destReg = getRandomReg(rngGen, GPRs);
+			testData tData = setRegistersAndGetInstrData(test, rngGen);
 
-			std::string sr1Str = gprWholeIntRange.getRandomRegister(rngGen).regName;
-			std::string sr2Str = gprWholeIntRange.getRandomRegister(rngGen).regName;
-
-			int32_t sr1Value = gprWholeIntRange.getRandom<int32_t>(rngGen);
-			int32_t sr2Value = gprWholeIntRange.getRandom<int32_t>(rngGen);
-
-			test.setRegister(sr1Str, sr1Value);
-			test.setRegister(sr2Str, sr2Value);
-
-			test.addInstr(instrName + " " + destReg.regName + " = " + sr1Str + ", " + sr2Str);
+			test.addInstr(tData.instr);
 			test.addInstr("nop");
 			test.addInstr("nop");
 			test.addInstr("nop");
-			test.expectRegisterValue("sl", (int32_t)func(sr1Value, sr2Value).Low);
-			test.expectRegisterValue("sh", (int32_t)func(sr1Value, sr2Value).High);
+			test.expectRegisterValue("sl", (int32_t)std::apply(func, tData.sourceValues).Low);
+			test.expectRegisterValue("sh", (int32_t)std::apply(func, tData.sourceValues).High);
 
 			test.close();
 		}
 	}
 };
 
-class ALUc_format : public uni_format<bool(int32_t, int32_t), sourceData<true, int32_t>, sourceData<true, int32_t>>
+class ALUc_format : public uni_format<bool, sourceData<true, int32_t>, sourceData<true, int32_t>>
 {
 public:
 	ALUc_format(std::string name, std::function<bool(int32_t, int32_t)> func) : uni_format(
@@ -622,7 +630,7 @@ public:
 	{}
 };
 
-class ALUci_format : public uni_format<bool(int32_t, int32_t), sourceData<true, int32_t>, sourceData<false, int32_t>>
+class ALUci_format : public uni_format<bool, sourceData<true, int32_t>, sourceData<false, int32_t>>
 {
 public:
 	ALUci_format(std::string name, std::function<bool(int32_t, int32_t)> func) : uni_format(
@@ -633,7 +641,7 @@ public:
 	{}
 };
 
-class ALUp_format : public uni_format<bool(bool, bool), sourceData<true, bool>, sourceData<true, bool>>
+class ALUp_format : public uni_format<bool, sourceData<true, bool>, sourceData<true, bool>>
 {
 public:
 	ALUp_format(std::string name, std::function<bool(bool, bool)> func) : uni_format(
@@ -644,7 +652,7 @@ public:
 	{}
 };
 
-class ALUb_format : public uni_format<int32_t(int32_t, int32_t, bool), sourceData<true, bool>, sourceData<false, bool>, sourceData<true, bool>>
+class ALUb_format : public uni_format<int32_t, sourceData<true, int32_t>, sourceData<false, int32_t>, sourceData<true, bool>>
 {
 public:
 	ALUb_format(std::string name, std::function<int32_t(int32_t, int32_t, bool)> func) : uni_format(
@@ -656,219 +664,27 @@ public:
 	{}
 };
 
-
-
-
-
-
-void make_Xd_Rs1_Rs2_Instr(std::string instrName, std::string regType, std::function<int32_t(int32_t, int32_t)> op)
+class SPCt_format : public uni_format<int32_t, sourceData<true, int32_t>>
 {
-	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
-	std::vector<int32_t> values{ 0, 1, 3, -5, 27893 };
-	for (size_t x = 0; x < values.size(); x++)
-	{
-		for (size_t y = 0; y < values.size(); y++)
-		{
-			test.setGPReg("r1", values[x]);
-			test.setGPReg("r2", values[y]);
-			test.addInstr(instrName + " " + regType + "3 = r1, r2");
-			test.expectRegisterValue(regType + "3", op(values[x], values[y]));
-		}
-	}
-	test.close();
-}
+public:
+	SPCt_format(std::string name) : uni_format(
+		name, Pipes::Both, SPRs,
+		gprWholeIntRange,
+		[](int32_t a) { return a; })
+	{}
+};
 
-void make_Xd_Rs1_Imm_Instr(std::string instrName, std::string regType, std::function<int32_t(int32_t, int32_t)> op, std::vector<int32_t>& immValues)
+class SPCf_format : public uni_format<int32_t, sourceData<true, int32_t>>
 {
-	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
-	std::vector<int32_t> valuesA{ 0, 1, 3, -5, 27893 };
-	for (size_t x = 0; x < valuesA.size(); x++)
-	{
-		for (size_t y = 0; y < immValues.size(); y++)
-		{
-			test.setGPReg("r1", valuesA[x]);
-			test.addInstr(instrName + " " + regType + "3 = r1, " + std::to_string(immValues[y]));
-			test.expectRegisterValue(regType + "3", op(valuesA[x], immValues[y]));
-		}
-	}
-	test.close();
-}
+public:
+	SPCf_format(std::string name) : uni_format(
+		name, Pipes::Both, GPRs,
+		opSource(SPRs, wholeIntRange),
+		[](int32_t a) { return a; })
+	{}
+};
 
-void makeALUrTest(std::string instrName, std::function<int32_t(int32_t, int32_t)> op)
-{
-	make_Xd_Rs1_Rs2_Instr(instrName, "r", op);
-}
 
-void makeALUiTest(std::string instrName, std::function<int32_t(int32_t, int32_t)> op)
-{
-	std::vector<int32_t> immValues{ 0, 1, 3, 273, 794 };
-	make_Xd_Rs1_Imm_Instr(instrName, "r", op, immValues);
-}
-
-void makeALUlTest(std::string instrName, std::function<int32_t(int32_t, int32_t)> op)
-{
-	std::vector<int32_t> immValues{ 85, 217389, -7, -1 };
-	make_Xd_Rs1_Imm_Instr(instrName, "r", op, immValues);
-}
-
-void makeALUmTest(std::string instrName, std::function<int32_t(uint32_t, uint32_t)> opL, std::function<int32_t(uint32_t, uint32_t)> opH)
-{
-	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
-	std::vector<int32_t> values{ 3, -5, 2037828393 };
-	for (size_t x = 0; x < values.size(); x++)
-	{
-		for (size_t y = 0; y < values.size(); y++)
-		{
-			test.setGPReg("r1", values[x]);
-			test.setGPReg("r2", values[y]);
-			test.addInstr(instrName + " r1, r2");
-			test.addInstr("nop");
-			test.addInstr("nop");
-			test.addInstr("nop");
-			test.expectRegisterValue("sl", opL(values[x], values[y]));
-			test.expectRegisterValue("sh", opH(values[x], values[y]));
-		}
-	}
-	test.close();
-}
-
-void makeALUcTest(std::string instrName, std::function<int32_t(int32_t, int32_t)> op)
-{
-	make_Xd_Rs1_Rs2_Instr(instrName, "p", op);
-}
-
-void makeALUciTest(std::string instrName, std::function<int32_t(int32_t, int32_t)> op)
-{
-	std::vector<int32_t> immValues{ 0, 1, 3, 17, 29 };
-	make_Xd_Rs1_Imm_Instr(instrName, "p", op, immValues);
-}
-
-void makeALUpTest(std::string instrName, std::function<bool(bool, bool)> op)
-{
-	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
-	std::vector<bool> values{ true, false };
-	for (size_t x = 0; x < values.size(); x++)
-	{
-		for (size_t y = 0; y < values.size(); y++)
-		{
-			test.setPred("p1", values[x]);
-			test.setPred("p2", values[y]);
-			test.addInstr(instrName + " p3 = p1, p2");
-			test.expectRegisterValue("p3", op(values[x], values[y]));
-		}
-	}
-	test.close();
-}
-
-void makeALUbTest(std::string instrName, std::function<int32_t(int32_t, int32_t, bool)> op)
-{
-	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
-	std::vector<int32_t> valuesA{ 85, 217389, -7, -1 };
-	std::vector<int32_t> immValues{ 0, 3, 29 };
-	std::vector<bool> predValues{ true, false };
-	for (size_t x = 0; x < valuesA.size(); x++)
-	{
-		for (size_t y = 0; y < immValues.size(); y++)
-		{
-			for (size_t z = 0; z < predValues.size(); z++)
-			{
-				test.setGPReg("r1", valuesA[x]);
-				test.setPred("p2", predValues[z]);
-				test.addInstr(instrName + " r3 = r1, " + std::to_string(immValues[y]) + ", p2");
-				test.expectRegisterValue("r3", op(valuesA[x], immValues[y], predValues[z]));
-			}
-		}
-	}
-	test.close();
-}
-
-void makeSPCtfTest(std::string instrName)
-{
-	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
-	std::vector<int32_t> values{ 85, 217389, -7, -1 };
-	for (size_t x = 0; x < values.size(); x++)
-	{
-		test.setGPReg("r1", values[x]);
-		test.addInstr(instrName + " s3 = r1");
-		test.expectRegisterValue("s3", values[x]);
-	}
-	test.close();
-}
-
-void makeBranchDelayTest(std::string instrName, int32_t delay)
-{
-	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
-	std::vector<int32_t> values{ 0, 3, 17 };
-	for (int32_t x = 0; x < values.size(); x++)
-	{
-		for (size_t y = 0; y < delay; y++)
-		{
-			test.setGPReg("r" + std::to_string(y + 1), x + 1);
-		}
-		test.setGPReg("r" + std::to_string(delay + 1), x + 1);
-
-		test.addInstr(instrName + " x" + std::to_string(x));
-
-		for (size_t y = 0; y < delay; y++)
-		{
-			test.setGPReg("r" + std::to_string(y + 1), y + 2 + x);
-		}
-		test.setGPReg("r" + std::to_string(delay + 1), delay + 2 + x);
-
-		for (size_t y = 0; y < values[x]; y++)
-		{
-			test.addInstr("nop");
-		}
-
-		test.addInstr("x" + std::to_string(x) + ": nop");
-
-		for (int32_t y = 0; y < delay; y++)
-		{
-			test.expectRegisterValue("r" + std::to_string(y + 1), y + 2 + x);
-		}
-		test.expectRegisterValue("r" + std::to_string(delay + 1), x + 1);
-
-	}
-	test.close();
-}
-
-void makeBranchNoDelayTest(std::string instrName)
-{
-	int delay = 2;
-	isaTest test(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, instrName);
-	std::vector<int32_t> values{ 0, 3, 17 };
-	for (int32_t x = 0; x < values.size(); x++)
-	{
-		for (size_t y = 0; y < delay; y++)
-		{
-			test.setGPReg("r" + std::to_string(y + 1), x + 1);
-		}
-		test.setGPReg("r" + std::to_string(delay + 1), x + 1);
-
-		test.addInstr(instrName + " x" + std::to_string(x));
-
-		for (size_t y = 0; y < delay; y++)
-		{
-			test.setGPReg("r" + std::to_string(y + 1), y + 2 + x);
-		}
-		test.setGPReg("r" + std::to_string(delay + 1), delay + 2 + x);
-
-		for (size_t y = 0; y < values[x]; y++)
-		{
-			test.addInstr("nop");
-		}
-
-		test.addInstr("x" + std::to_string(x) + ": nop");
-
-		for (int32_t y = 0; y < delay; y++)
-		{
-			test.expectRegisterValue("r" + std::to_string(y + 1), x + 1);
-		}
-		test.expectRegisterValue("r" + std::to_string(delay + 1), x + 1);
-
-	}
-	test.close();
-}
 
 void makeFPUrTest(std::string instrName, std::function<float(float, float)> op)
 {
@@ -1141,11 +957,11 @@ int main(int argc, char const *argv[])
 		new ALUl_format("shaddl", [](int32_t a, int32_t b) { return (a << 1) + b; }),
 		new ALUl_format("shadd2l", [](int32_t a, int32_t b) { return (a << 2) + b; }),
 
-		//ALUm
+		// ALUm
 		new ALUm_format("mul" , SignMul),
 		new ALUm_format("mulu", UnsignMul),
 
-		//// ALUc
+		// ALUc
 		new ALUc_format("cmpeq", std::equal_to()),
 		new ALUc_format("cmpneq", std::not_equal_to()),
 		new ALUc_format("cmplt", std::less()),
@@ -1170,6 +986,12 @@ int main(int argc, char const *argv[])
 
 		// ALUb
 		new ALUb_format("bcopy", [](int32_t a, int32_t b, bool pred) { return (a & ~(1 << b)) | (pred << b); }),
+
+		// SPCt
+		new SPCt_format("mts"),
+
+		// SPCf
+		new SPCf_format("mfs"),
 	};
 
 	std::mt19937 rngGen(37);
@@ -1179,21 +1001,6 @@ int main(int argc, char const *argv[])
 		instr->makeTests(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, rngGen, 10);
 	}
 
-
-	//// SPCt and SPCf
-	//makeSPCtfTest("mts");
-
-	//// CFLi Delayed
-	////makeBranchDelayTest("call", 3);
-	////makeBranchDelayTest("br", 2);
-	////makeBranchDelayTest("brcf", 3);
-
-	//// CFLi Non delayed
-	////makeBranchNoDelayTest("callnd");
-	////makeBranchNoDelayTest("brnd");
-	////makeBranchNoDelayTest("brcfnd");
-
-	//
 	//// FPUr tests
 	//makeFPUrTest("fadds", std::plus<float>());
 	//makeFPUrTest("fsubs", std::minus<float>());
