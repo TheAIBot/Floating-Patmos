@@ -356,7 +356,7 @@ std::vector<regInfo> SPRs = {
 	regInfo("s15", 15)
 };
 
-regInfo getRandomReg(std::mt19937 rngGen, std::vector<regInfo>& regSrc)
+regInfo getRandomReg(std::mt19937& rngGen, std::vector<regInfo>& regSrc)
 {
 	std::uniform_int_distribution<int32_t> distribution(0, regSrc.size() - 1);
 	return regSrc[distribution(rngGen)];
@@ -405,27 +405,27 @@ public:
 		return src;
 	} 
 
-	regInfo getRandomRegister(std::mt19937 rngGen) const
+	regInfo getRandomRegister(std::mt19937& rngGen) const
 	{
 		return getRandomReg(rngGen, *regSrc);
 	}
 
 	template<class T>
-	T getRandom(std::mt19937 rngGen) const
+	T getRandom(std::mt19937& rngGen) const
 	{
 		static_assert(true, "getRandom does not support ");
 		return 0;
 	}
 
 	template<>
-	int32_t getRandom<int32_t>(std::mt19937 rngGen) const
+	int32_t getRandom<int32_t>(std::mt19937& rngGen) const
 	{
 		std::uniform_int_distribution<int32_t> distribution(intRange.inclusiveMin, intRange.inclusiveMax);
 		return distribution(rngGen);
 	}
 
 	template<>
-	float getRandom<float>(std::mt19937 rngGen) const
+	float getRandom<float>(std::mt19937& rngGen) const
 	{
 		std::uniform_real_distribution<float> distribution(floatRange.inclusiveMin, floatRange.inclusiveMax);
 		return distribution(rngGen);
@@ -459,7 +459,7 @@ protected:
 	{ }
 
 public:
-	virtual void makeTests(std::string asmfilepath, std::string expfilepath, std::mt19937 rngGen, int32_t testCount) const = 0;
+	virtual void makeTests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const = 0;
 };
 
 template<bool value>
@@ -498,14 +498,14 @@ public:
 	}
 
 	template<typename T>
-	regInfo setAndReturnRegister(isaTest& test, const opSource& src, T value, std::mt19937 rngGen) const
+	regInfo setAndReturnRegister(isaTest& test, const opSource& src, T value, std::mt19937& rngGen) const
 	{
 		regInfo rndReg = src.getRandomRegister(rngGen);
 		test.setRegister(rndReg.regName, value);
 		return rndReg;
 	}
 
-	void makeTests(std::string asmfilepath, std::string expfilepath, std::mt19937 rngGen, int32_t testCount) const override
+	void makeTests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const override
 	{
 		for (size_t i = 0; i < testCount; i++)
 		{
@@ -598,7 +598,7 @@ public:
 	ALUm_format(std::string name, std::function<mulRes(uint32_t, uint32_t)> func) : baseFormat(name, Pipes::First), func(func)
 	{}
 
-	void makeTests(std::string asmfilepath, std::string expfilepath, std::mt19937 rngGen, int32_t testCount) const override
+	void makeTests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const override
 	{
 		for (size_t i = 0; i < testCount; i++)
 		{
