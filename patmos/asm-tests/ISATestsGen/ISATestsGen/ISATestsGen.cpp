@@ -153,8 +153,8 @@ int main(int argc, char const *argv[])
 	//TESTS_DIR_ASM = argv[1];
 	//TESTS_DIR_EXPECTED = argv[2];
 
-	std::string TESTS_DIR_ASM = "C:/Users/Andreas/Documents/GitHub/Floating-Patmos/patmos/asm-tests/ISATestsGen/out/build/x64-Debug/test-asm";
-	std::string TESTS_DIR_EXPECTED = "C:/Users/Andreas/Documents/GitHub/Floating-Patmos/patmos/asm-tests/ISATestsGen/out/build/x64-Debug/expected-uart";
+	std::string TESTS_DIR_ASM = "./test-asm";
+	std::string TESTS_DIR_EXPECTED = "./expected-uart";
 
 
 
@@ -165,68 +165,68 @@ int main(int argc, char const *argv[])
 
 	std::vector<baseFormat*> instrs = {
 		// ALUr
-		new ALUr_format("add", std::plus<int32_t>()),
-		new ALUr_format("sub", std::minus<int32_t>()),
-		new ALUr_format("xor", std::bit_xor<int32_t>()),
-		new ALUr_format("sl", [](int32_t a, int32_t b) { return a << (b & 0x1f); }),
-		new ALUr_format("sr", [](int32_t a, int32_t b) { return ((uint32_t)a) >> (b & 0x1f); }),
-		new ALUr_format("sra", [](int32_t a, int32_t b) { return a >> (b & 0x1f); }),
-		new ALUr_format("or", std::bit_or<int32_t>()),
-		new ALUr_format("and", std::bit_and<int32_t>()),
-		new ALUr_format("nor", [](int32_t a, int32_t b) { return ~(a | b); }),
-		new ALUr_format("shadd", [](int32_t a, int32_t b) { return (a << 1) + b; }),
-		new ALUr_format("shadd2", [](int32_t a, int32_t b) { return (a << 2) + b; }),
+		new ALUr_format("add"   , 0b0000, std::plus<int32_t>()),
+		new ALUr_format("sub"   , 0b0001, std::minus<int32_t>()),
+		new ALUr_format("xor"   , 0b0010, std::bit_xor<int32_t>()),
+		new ALUr_format("sl"    , 0b0011, [](int32_t a, int32_t b) { return a << (b & 0x1f); }),
+		new ALUr_format("sr"    , 0b0100, [](int32_t a, int32_t b) { return ((uint32_t)a) >> (b & 0x1f); }),
+		new ALUr_format("sra"   , 0b0101, [](int32_t a, int32_t b) { return a >> (b & 0x1f); }),
+		new ALUr_format("or"    , 0b0110, std::bit_or<int32_t>()),
+		new ALUr_format("and"   , 0b0111, std::bit_and<int32_t>()),
+		new ALUr_format("nor"   , 0b1011, [](int32_t a, int32_t b) { return ~(a | b); }),
+		new ALUr_format("shadd" , 0b1100, [](int32_t a, int32_t b) { return (a << 1) + b; }),
+		new ALUr_format("shadd2", 0b1101, [](int32_t a, int32_t b) { return (a << 2) + b; }),
 
 		// ALUi
-		new ALUi_format("addi", std::plus<int32_t>()),
-		new ALUi_format("subi", std::minus<int32_t>()),
-		new ALUi_format("xori", std::bit_xor<int32_t>()),
-		new ALUi_format("sli", [](int32_t a, int32_t b) { return a << (b & 0x1f); }),
-		new ALUi_format("sri", [](int32_t a, int32_t b) { return ((uint32_t)a) >> (b & 0x1f); }),
-		new ALUi_format("srai", [](int32_t a, int32_t b) { return a >> (b & 0x1f); }),
-		new ALUi_format("ori", std::bit_or<int32_t>()),
-		new ALUi_format("andi", std::bit_and<int32_t>()),
+		new ALUi_format("addi", 0b0000, std::plus<int32_t>()),
+		new ALUi_format("subi", 0b0001, std::minus<int32_t>()),
+		new ALUi_format("xori", 0b0010, std::bit_xor<int32_t>()),
+		new ALUi_format("sli" , 0b0011, [](int32_t a, int32_t b) { return a << (b & 0x1f); }),
+		new ALUi_format("sri" , 0b0100, [](int32_t a, int32_t b) { return ((uint32_t)a) >> (b & 0x1f); }),
+		new ALUi_format("srai", 0b0101, [](int32_t a, int32_t b) { return a >> (b & 0x1f); }),
+		new ALUi_format("ori" , 0b0110, std::bit_or<int32_t>()),
+		new ALUi_format("andi", 0b0111, std::bit_and<int32_t>()),
 
 		// ALUl
-		new ALUl_format("addl", std::plus<int32_t>()),
-		new ALUl_format("subl", std::minus<int32_t>()),
-		new ALUl_format("xorl", std::bit_xor<int32_t>()),
-		new ALUl_format("sll", [](int32_t a, int32_t b) { return a << (b & 0x1f); }),
-		new ALUl_format("srl", [](int32_t a, int32_t b) { return ((uint32_t)a) >> (b & 0x1f); }),
-		new ALUl_format("sral", [](int32_t a, int32_t b) { return a >> (b & 0x1f); }),
-		new ALUl_format("orl", std::bit_or<int32_t>()),
-		new ALUl_format("andl", std::bit_and<int32_t>()),
-		new ALUl_format("norl", [](int32_t a, int32_t b) { return ~(a | b); }),
-		new ALUl_format("shaddl", [](int32_t a, int32_t b) { return (a << 1) + b; }),
-		new ALUl_format("shadd2l", [](int32_t a, int32_t b) { return (a << 2) + b; }),
+		new ALUl_format("addl"   , 0b0000, std::plus<int32_t>()),
+		new ALUl_format("subl"   , 0b0001, std::minus<int32_t>()),
+		new ALUl_format("xorl"   , 0b0010, std::bit_xor<int32_t>()),
+		new ALUl_format("sll"    , 0b0011, [](int32_t a, int32_t b) { return a << (b & 0x1f); }),
+		new ALUl_format("srl"    , 0b0100, [](int32_t a, int32_t b) { return ((uint32_t)a) >> (b & 0x1f); }),
+		new ALUl_format("sral"   , 0b0101, [](int32_t a, int32_t b) { return a >> (b & 0x1f); }),
+		new ALUl_format("orl"    , 0b0110, std::bit_or<int32_t>()),
+		new ALUl_format("andl"   , 0b0111, std::bit_and<int32_t>()),
+		new ALUl_format("norl"   , 0b1011, [](int32_t a, int32_t b) { return ~(a | b); }),
+		new ALUl_format("shaddl" , 0b1100, [](int32_t a, int32_t b) { return (a << 1) + b; }),
+		new ALUl_format("shadd2l", 0b1101, [](int32_t a, int32_t b) { return (a << 2) + b; }),
 
 		// ALUm
-		new ALUm_format("mul" , SignMul),
-		new ALUm_format("mulu", UnsignMul),
+		new ALUm_format("mul" , 0b0000, SignMul),
+		new ALUm_format("mulu", 0b0001, UnsignMul),
 
 		// ALUc
-		new ALUc_format("cmpeq", std::equal_to()),
-		new ALUc_format("cmpneq", std::not_equal_to()),
-		new ALUc_format("cmplt", std::less()),
-		new ALUc_format("cmple", std::less_equal()),
-		new ALUc_format("cmpult", std::less<uint32_t>()),
-		new ALUc_format("cmpule", std::less_equal<uint32_t>()),
-		new ALUc_format("btest", [](int32_t a, int32_t b) { return (a & (1 << b)) != 0; }),
+		new ALUc_format("cmpeq" , 0b0000, std::equal_to()),
+		new ALUc_format("cmpneq", 0b0001, std::not_equal_to()),
+		new ALUc_format("cmplt" , 0b0010, std::less()),
+		new ALUc_format("cmple" , 0b0011, std::less_equal()),
+		new ALUc_format("cmpult", 0b0100, std::less<uint32_t>()),
+		new ALUc_format("cmpule", 0b0101, std::less_equal<uint32_t>()),
+		new ALUc_format("btest" , 0b0110, [](int32_t a, int32_t b) { return (a & (1 << b)) != 0; }),
 
 		// ALUci
-		new ALUci_format("cmpieq", std::equal_to()),
-		new ALUci_format("cmpineq", std::not_equal_to()),
-		new ALUci_format("cmpilt", std::less()),
-		new ALUci_format("cmpile", std::less_equal()),
-		new ALUci_format("cmpiult", std::less<uint32_t>()),
-		new ALUci_format("cmpiule", std::less_equal<uint32_t>()),
-		new ALUci_format("btesti", [](int32_t a, int32_t b) { return (a & (1 << b)) != 0; }),
+		new ALUci_format("cmpieq" , 0b0000, std::equal_to()),
+		new ALUci_format("cmpineq", 0b0001, std::not_equal_to()),
+		new ALUci_format("cmpilt" , 0b0010, std::less()),
+		new ALUci_format("cmpile" , 0b0011, std::less_equal()),
+		new ALUci_format("cmpiult", 0b0100, std::less<uint32_t>()),
+		new ALUci_format("cmpiule", 0b0101, std::less_equal<uint32_t>()),
+		new ALUci_format("btesti" , 0b0110, [](int32_t a, int32_t b) { return (a & (1 << b)) != 0; }),
 
 		// ALUp
-		new ALUp_format("por" , std::logical_or()),
-		new ALUp_format("pand", std::logical_and()),
-		new ALUp_format("pxor", std::not_equal_to()),
-
+		new ALUp_format("por" , 0b0110, std::logical_or()),
+		new ALUp_format("pand", 0b0111, std::logical_and()),
+		new ALUp_format("pxor", 0b1010, std::not_equal_to()),
+		/*
 		// ALUb
 		new ALUb_format("bcopy", [](int32_t a, int32_t b, bool pred) { return (a & ~(1 << b)) | (pred << b); }),
 
@@ -269,12 +269,13 @@ int main(int argc, char const *argv[])
 		new FPUc_format("feqs", std::equal_to<float>()),
 		new FPUc_format("flts", std::less<float>()),
 		new FPUc_format("fles", std::less_equal<float>()),
+			*/
 	};
 
 	std::mt19937 rngGen(37);
 	for each (baseFormat* instr in instrs)
 	{
-		instr->makeTests(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, rngGen, 10);
+		instr->make_single_op_tests(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, rngGen, 10);
 	}	
 
 	std::cout << "Tests generated." << std::endl;

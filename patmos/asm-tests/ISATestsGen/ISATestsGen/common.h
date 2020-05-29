@@ -1,14 +1,6 @@
 #pragma once
 
-template<typename T>
-struct valueRange
-{
-	T inclusiveMin;
-	T inclusiveMax;
-
-	valueRange(T inclusiveMin, T inclusiveMax) : inclusiveMin(inclusiveMin), inclusiveMax(inclusiveMax)
-	{ }
-};
+#include <cstdint>
 
 enum class Pipes
 {
