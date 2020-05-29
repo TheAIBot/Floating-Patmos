@@ -226,7 +226,7 @@ int main(int argc, char const *argv[])
 		new ALUp_format("por" , 0b0110, std::logical_or()),
 		new ALUp_format("pand", 0b0111, std::logical_and()),
 		new ALUp_format("pxor", 0b1010, std::not_equal_to()),
-		/*
+		
 		// ALUb
 		new ALUb_format("bcopy", [](int32_t a, int32_t b, bool pred) { return (a & ~(1 << b)) | (pred << b); }),
 
@@ -235,41 +235,40 @@ int main(int argc, char const *argv[])
 
 		// SPCf
 		new SPCf_format("mfs"),
-
+		
 		// FPUr
-		new FPUr_format("fadds", std::plus<float>()),
-		new FPUr_format("fsubs", std::minus<float>()),
-		new FPUr_format("fmuls", std::multiplies<float>()),
-		new FPUr_format("fdivs", std::divides<float>()),
-		new FPUr_format("fsgnjs", std::copysignf),
-		new FPUr_format("fsgnjns", [](float a, float b) { return std::copysignf(a, (!std::signbit(b)) ? -0.0f : +0.0f); }),
-		new FPUr_format("fsgnjxs", [](float a, float b) { return std::copysignf(a, (std::signbit(a) != std::signbit(b)) ? -0.0f : +0.0f); }),
+		new FPUr_format("fadds"  , 0b0000, std::plus<float>()),
+		new FPUr_format("fsubs"  , 0b0001, std::minus<float>()),
+		new FPUr_format("fmuls"  , 0b0010, std::multiplies<float>()),
+		new FPUr_format("fdivs"  , 0b0011, std::divides<float>()),
+		new FPUr_format("fsgnjs" , 0b0100, std::copysignf),
+		new FPUr_format("fsgnjns", 0b0101, [](float a, float b) { return std::copysignf(a, (!std::signbit(b)) ? -0.0f : +0.0f); }),
+		new FPUr_format("fsgnjxs", 0b0110, [](float a, float b) { return std::copysignf(a, (std::signbit(a) != std::signbit(b)) ? -0.0f : +0.0f); }),
 
 		// FPUl
-		new FPUl_format("faddsl", std::plus<float>()),
-		new FPUl_format("fsubsl", std::minus<float>()),
-		new FPUl_format("fmulsl", std::multiplies<float>()),
-		new FPUl_format("fdivsl", std::divides<float>()),
+		new FPUl_format("faddsl", 0b0000, std::plus<float>()),
+		new FPUl_format("fsubsl", 0b0001, std::minus<float>()),
+		new FPUl_format("fmulsl", 0b0010, std::multiplies<float>()),
+		new FPUl_format("fdivsl", 0b0011, std::divides<float>()),
 
 		// FPUrs
-		new FPUrs_format("fsqrts", [](float a) { return std::sqrt(a); }),
-
-		// FPCt
-		new FPCt_format("fcvtis", [](int32_t a) { return static_cast<float>(a); }),
-		new FPCt_format("fcvtus", [](int32_t a) { return static_cast<float>(static_cast<uint32_t>(a)); }),
-		new FPCt_format("fmvis", [](int32_t a) { return reinterpret_cast<float&>(a); }),
-
-		// FPCf
-		new FPCf_format("fcvtsi", [](float a) { return static_cast<int32_t>(a); }, no_special_tests, float_to_int_rounding),
-		new FPCf_format("fcvtsu", [](float a) { return static_cast<uint32_t>(a); }, no_special_tests, float_to_int_rounding),
-		new FPCf_format("fmvsi", [](float a) { return reinterpret_cast<int32_t&>(a); }),
-		new FPCf_format("fclasss", classifyFloat, fclass_special_test),
+		new FPUrs_format("fsqrts", 0b0000, [](float a) { return std::sqrt(a); }),
 
 		//FPUc
-		new FPUc_format("feqs", std::equal_to<float>()),
-		new FPUc_format("flts", std::less<float>()),
-		new FPUc_format("fles", std::less_equal<float>()),
-			*/
+		new FPUc_format("feqs", 0b0000, std::equal_to<float>()),
+		new FPUc_format("flts", 0b0001, std::less<float>()),
+		new FPUc_format("fles", 0b0010, std::less_equal<float>()),
+
+		// FPCt
+		new FPCt_format("fcvtis", 0b0000, [](int32_t a) { return static_cast<float>(a); }),
+		new FPCt_format("fcvtus", 0b0001, [](int32_t a) { return static_cast<float>(static_cast<uint32_t>(a)); }),
+		new FPCt_format("fmvis" , 0b0010, [](int32_t a) { return reinterpret_cast<float&>(a); }),
+
+		// FPCf
+		new FPCf_format("fcvtsi" , 0b0000, [](float a) { return static_cast<int32_t>(a); }, no_special_tests, float_to_int_rounding),
+		new FPCf_format("fcvtsu" , 0b0001, [](float a) { return static_cast<uint32_t>(a); }, no_special_tests, float_to_int_rounding),
+		new FPCf_format("fmvsi"  , 0b0010, [](float a) { return reinterpret_cast<int32_t&>(a); }),
+		new FPCf_format("fclasss", 0b0011, classifyFloat, fclass_special_test),
 	};
 
 	std::mt19937 rngGen(37);
