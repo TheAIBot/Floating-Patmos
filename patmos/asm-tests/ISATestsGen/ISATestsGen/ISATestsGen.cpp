@@ -14,154 +14,133 @@
 #include <random>
 #include <tuple>
 #include <type_traits>
+#include <filesystem>
 #include "ISATestsGen.h"
 
 #pragma STDC FENV_ACCESS ON
 #pragma fenv_access (on)
 
-
-
-mulRes SignMul(uint32_t a, uint32_t b)
+namespace patmos
 {
-	int32_t op1H = ((int32_t)a) >> 16;
-	int32_t op2H = ((int32_t)b) >> 16;
-	int32_t op1L = a & 0xffff;
-	int32_t op2L = b & 0xffff;
+	mulRes SignMul(uint32_t a, uint32_t b)
+	{
+		int32_t op1H = ((int32_t)a) >> 16;
+		int32_t op2H = ((int32_t)b) >> 16;
+		int32_t op1L = a & 0xffff;
+		int32_t op2L = b & 0xffff;
 
-	uint32_t mulLL = op1L * op2L;
-	uint32_t mulLH = op1L * op2H;
-	uint32_t mulHL = op1H * op2L;
-	uint32_t mulHH = op1H * op2H;
+		uint32_t mulLL = op1L * op2L;
+		uint32_t mulLH = op1L * op2H;
+		uint32_t mulHL = op1H * op2L;
+		uint32_t mulHH = op1H * op2H;
 
-	int64_t catHHLL = (((uint64_t)mulHH) << 32) | ((uint64_t)mulLL);
-	int64_t catHL = (int64_t)(int32_t)mulHL << 16;
-	int64_t catLH = (int64_t)(int32_t)mulLH << 16;
+		int64_t catHHLL = (((uint64_t)mulHH) << 32) | ((uint64_t)mulLL);
+		int64_t catHL = (int64_t)(int32_t)mulHL << 16;
+		int64_t catLH = (int64_t)(int32_t)mulLH << 16;
 
-	uint64_t res = catHHLL + catHL + catLH;
+		uint64_t res = catHHLL + catHL + catLH;
 
-	mulRes mRes;
-	mRes.Low = res;
-	mRes.High = res >> 32;
+		mulRes mRes;
+		mRes.Low = res;
+		mRes.High = res >> 32;
 
-	return mRes;
-}
+		return mRes;
+	}
 
-mulRes UnsignMul(uint32_t a, uint32_t b)
-{
-	int32_t op1H = ((uint32_t)a) >> 16;
-	int32_t op2H = ((uint32_t)b) >> 16;
-	int32_t op1L = a & 0xffff;
-	int32_t op2L = b & 0xffff;
+	mulRes UnsignMul(uint32_t a, uint32_t b)
+	{
+		int32_t op1H = ((uint32_t)a) >> 16;
+		int32_t op2H = ((uint32_t)b) >> 16;
+		int32_t op1L = a & 0xffff;
+		int32_t op2L = b & 0xffff;
 
-	uint32_t mulLL = op1L * op2L;
-	uint32_t mulLH = op1L * op2H;
-	uint32_t mulHL = op1H * op2L;
-	uint32_t mulHH = op1H * op2H;
+		uint32_t mulLL = op1L * op2L;
+		uint32_t mulLH = op1L * op2H;
+		uint32_t mulHL = op1H * op2L;
+		uint32_t mulHH = op1H * op2H;
 
-	int64_t catHHLL = (((uint64_t)mulHH) << 32) | ((uint64_t)mulLL);
-	int64_t catHL = (int64_t)(uint32_t)mulHL << 16;
-	int64_t catLH = (int64_t)(uint32_t)mulLH << 16;
+		int64_t catHHLL = (((uint64_t)mulHH) << 32) | ((uint64_t)mulLL);
+		int64_t catHL = (int64_t)(uint32_t)mulHL << 16;
+		int64_t catLH = (int64_t)(uint32_t)mulLH << 16;
 
-	uint64_t res = catHHLL + catHL + catLH;
+		uint64_t res = catHHLL + catHL + catLH;
 
-	mulRes mRes;
-	mRes.Low = res;
-	mRes.High = res >> 32;
+		mulRes mRes;
+		mRes.Low = res;
+		mRes.High = res >> 32;
 
-	return mRes;
-}
+		return mRes;
+	}
 
-int32_t classifyFloat(float a)
-{
-	int32_t ai = reinterpret_cast<int32_t&>(a);
-	bool isQuietNan = (ai & (1 << 22)) != 0;
+	int32_t classifyFloat(float a)
+	{
+		int32_t ai = reinterpret_cast<int32_t&>(a);
+		bool isQuietNan = (ai & (1 << 22)) != 0;
 
-	return (std::isnan(a) && !isQuietNan) << 9 |
-		(std::isnan(a) && isQuietNan) << 8 |
-		(std::signbit(a) && std::isinf(a)) << 7 |
-		(std::signbit(a) && std::isnormal(a)) << 6 |
-		(std::signbit(a) && std::fpclassify(a) == FP_SUBNORMAL) << 5 |
-		(std::signbit(a) && a == 0.0) << 4 |
-		(!std::signbit(a) && a == 0.0) << 3 |
-		(!std::signbit(a) && std::fpclassify(a) == FP_SUBNORMAL) << 2 |
-		(!std::signbit(a) && std::isnormal(a)) << 1 |
-		(!std::signbit(a) && std::isinf(a)) << 0;
-}
+		return (std::isnan(a) && !isQuietNan) << 9 |
+			(std::isnan(a) && isQuietNan) << 8 |
+			(std::signbit(a) && std::isinf(a)) << 7 |
+			(std::signbit(a) && std::isnormal(a)) << 6 |
+			(std::signbit(a) && std::fpclassify(a) == FP_SUBNORMAL) << 5 |
+			(std::signbit(a) && a == 0.0) << 4 |
+			(!std::signbit(a) && a == 0.0) << 3 |
+			(!std::signbit(a) && std::fpclassify(a) == FP_SUBNORMAL) << 2 |
+			(!std::signbit(a) && std::isnormal(a)) << 1 |
+			(!std::signbit(a) && std::isinf(a)) << 0;
+	}
 
+	void makeClassifyTest(isaTest& test)
+	{
+		float f1 = std::numeric_limits<float>::signaling_NaN();
+		float f2 = std::numeric_limits<float>::quiet_NaN();
+		float f3 = std::copysign(std::numeric_limits<float>::infinity(), -1.0f);
+		float f4 = -3.5f;
+		float f5 = std::copysign(std::numeric_limits<float>::denorm_min(), -1.0f);
+		float f6 = -0.0f;
+		float f7 = 0.0f;
+		float f8 = std::copysign(std::numeric_limits<float>::denorm_min(), 1.0f);
+		float f9 = 3.5f;
+		float f10 = std::copysign(std::numeric_limits<float>::infinity(), 1.0f);
+		test.setRegister("f1", f1);
+		test.setRegister("f2", f2);
+		test.setRegister("f3", f3);
+		test.setRegister("f4", f4);
+		test.setRegister("f5", f5);
+		test.setRegister("f6", f6);
+		test.setRegister("f7", f7);
+		test.setRegister("f8", f8);
+		test.setRegister("f9", f9);
+		test.setRegister("f10", f10);
+		test.addInstr("fclasss r10 = f1");
+		test.addInstr("fclasss r11 = f2");
+		test.addInstr("fclasss r12 = f3");
+		test.addInstr("fclasss r13 = f4");
+		test.addInstr("fclasss r14 = f5");
+		test.addInstr("fclasss r15 = f6");
+		test.addInstr("fclasss r16 = f7");
+		test.addInstr("fclasss r17 = f8");
+		test.addInstr("fclasss r18 = f9");
+		test.addInstr("fclasss r19 = f10");
+		test.expectRegisterValue("r10", classifyFloat(f1));
+		test.expectRegisterValue("r11", classifyFloat(f2));
+		test.expectRegisterValue("r12", classifyFloat(f3));
+		test.expectRegisterValue("r13", classifyFloat(f4));
+		test.expectRegisterValue("r14", classifyFloat(f5));
+		//test.expectRegisterValue("r15", classifyFloat(f6));
+		test.expectRegisterValue("r16", classifyFloat(f7));
+		test.expectRegisterValue("r17", classifyFloat(f8));
+		test.expectRegisterValue("r18", classifyFloat(f9));
+		test.expectRegisterValue("r19", classifyFloat(f10));
+		test.close();
+	}
 
-void makeClassifyTest(isaTest& test)
-{
-	float f1 = std::numeric_limits<float>::signaling_NaN();
-	float f2 = std::numeric_limits<float>::quiet_NaN();
-	float f3 = std::copysign(std::numeric_limits<float>::infinity(), -1.0f);
-	float f4 = -3.5f;
-	float f5 = std::copysign(std::numeric_limits<float>::denorm_min(), -1.0f);
-	float f6 = -0.0f;
-	float f7 = 0.0f;
-	float f8 = std::copysign(std::numeric_limits<float>::denorm_min(), 1.0f);
-	float f9 = 3.5f;
-	float f10 = std::copysign(std::numeric_limits<float>::infinity(), 1.0f);
-	test.setRegister("f1", f1);
-	test.setRegister("f2", f2);
-	test.setRegister("f3", f3);
-	test.setRegister("f4", f4);
-	test.setRegister("f5", f5);
-	test.setRegister("f6", f6);
-	test.setRegister("f7", f7);
-	test.setRegister("f8", f8);
-	test.setRegister("f9", f9);
-	test.setRegister("f10", f10);
-	test.addInstr("fclasss r10 = f1");
-	test.addInstr("fclasss r11 = f2");
-	test.addInstr("fclasss r12 = f3");
-	test.addInstr("fclasss r13 = f4");
-	test.addInstr("fclasss r14 = f5");
-	test.addInstr("fclasss r15 = f6");
-	test.addInstr("fclasss r16 = f7");
-	test.addInstr("fclasss r17 = f8");
-	test.addInstr("fclasss r18 = f9");
-	test.addInstr("fclasss r19 = f10");
-	test.expectRegisterValue("r10", classifyFloat(f1));
-	test.expectRegisterValue("r11", classifyFloat(f2));
-	test.expectRegisterValue("r12", classifyFloat(f3));
-	test.expectRegisterValue("r13", classifyFloat(f4));
-	test.expectRegisterValue("r14", classifyFloat(f5));
-	//test.expectRegisterValue("r15", classifyFloat(f6));
-	test.expectRegisterValue("r16", classifyFloat(f7));
-	test.expectRegisterValue("r17", classifyFloat(f8));
-	test.expectRegisterValue("r18", classifyFloat(f9));
-	test.expectRegisterValue("r19", classifyFloat(f10));
-	test.close();
-}
+	const std::vector<rounding::x86_round_mode> float_to_int_rounding = {
+		rounding::x86_round_mode::RTZ
+	};
 
-const std::vector<rounding::x86_round_mode> float_to_int_rounding = {
-	rounding::x86_round_mode::RTZ
-};
-
-const std::vector<std::function<void(isaTest&)>> fclass_special_test = {
-	makeClassifyTest
-};
-
-int main(int argc, char const *argv[])
-{
-	//if (argc != 3)
-	//{
-	//	std::cerr << "Usage: ISATestsGen <output .s> <output expected>" << std::endl;
-	//	return 1;
-	//}
-
-	//TESTS_DIR_ASM = argv[1];
-	//TESTS_DIR_EXPECTED = argv[2];
-
-	std::string TESTS_DIR_ASM = "./test-asm";
-	std::string TESTS_DIR_EXPECTED = "./expected-uart";
-
-
-
-	std::cout << "Generating tests..." << std::endl;
-    
-
-    std::fesetround(FE_TONEAREST);
+	const std::vector<std::function<void(isaTest&)>> fclass_special_test = {
+		makeClassifyTest
+	};
 
 	std::vector<baseFormat*> instrs = {
 		// ALUr
@@ -270,11 +249,37 @@ int main(int argc, char const *argv[])
 		new FPCf_format("fmvsi"  , 0b0010, [](float a) { return reinterpret_cast<int32_t&>(a); }),
 		new FPCf_format("fclasss", 0b0011, classifyFloat, fclass_special_test),
 	};
+}
+
+int main(int argc, char const *argv[])
+{
+	if (argc != 3)
+	{
+		std::cerr << "Usage: ISATestsGen <output .s> <output expected>" << std::endl;
+		return 1;
+	}
+
+	std::string TESTS_DIR_ASM = argv[1];
+	std::string TESTS_DIR_EXPECTED = argv[2];
+
+	//std::string TESTS_DIR_ASM = "./test-asm";
+	//std::string TESTS_DIR_EXPECTED = "./expected-uart";
+
+
+
+	std::cout << "Generating tests..." << std::endl;
+	
+
+	std::fesetround(FE_TONEAREST);
+
+	std::string single_op_asm_dir = patmos::create_dir_if_not_exists(TESTS_DIR_ASM, "single_op_tests");
+	std::string single_op_uart_dir = patmos::create_dir_if_not_exists(TESTS_DIR_EXPECTED, "single_op_tests");
+	
 
 	std::mt19937 rngGen(37);
-	for each (baseFormat* instr in instrs)
+	for (patmos::baseFormat* instr : patmos::instrs)
 	{
-		instr->make_single_op_tests(TESTS_DIR_ASM, TESTS_DIR_EXPECTED, rngGen, 10);
+		instr->make_single_op_tests(single_op_asm_dir, single_op_uart_dir, rngGen, 50);
 	}	
 
 	std::cout << "Tests generated." << std::endl;

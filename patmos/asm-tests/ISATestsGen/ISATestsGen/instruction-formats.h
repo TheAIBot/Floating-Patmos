@@ -11,31 +11,30 @@
 #include <stdexcept>
 #include <functional>
 #include <numeric>
+#include <filesystem>
 
-
-
-class baseFormat
+namespace patmos
 {
-protected:
-	std::string instrName;
-	Pipes pipe;
+	class baseFormat
+	{
+	protected:
+		std::string instrName;
+		Pipes pipe;
 
-	baseFormat(std::string name, Pipes pipe) : instrName(name), pipe(pipe)
-	{ }
+		baseFormat(std::string name, Pipes pipe) : instrName(name), pipe(pipe)
+		{ }
 
-public:
-	//virtual void makeTests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const = 0;
+	public:
+		//virtual void makeTests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const = 0;
 
-	virtual void make_single_op_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const = 0;
-	//virtual void make_loop_op_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const = 0;
-	//virtual void make_forwarding_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const = 0;
-	//virtual void make_pipelined_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const = 0;
+		virtual void make_single_op_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const = 0;
+		//virtual void make_loop_op_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const = 0;
+		//virtual void make_forwarding_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const = 0;
+		//virtual void make_pipelined_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const = 0;
 
-	//virtual std::vector<int32_t> encode(std::string instr) const = 0;
-};
+		//virtual std::vector<int32_t> encode(std::string instr) const = 0;
+	};
 
-namespace
-{
 	template<typename T>
 	struct valueRange
 	{
@@ -74,25 +73,11 @@ namespace
 			return getRandomReg(rngGen, *regSrc);
 		}
 
-		template<class T>
+		template<typename T>
 		T getRandom(std::mt19937& rngGen) const
 		{
 			static_assert(true, "getRandom does not support ");
 			return 0;
-		}
-
-		template<>
-		int32_t getRandom<int32_t>(std::mt19937& rngGen) const
-		{
-			std::uniform_int_distribution<int32_t> distribution(intRange.inclusiveMin, intRange.inclusiveMax);
-			return distribution(rngGen);
-		}
-
-		template<>
-		float getRandom<float>(std::mt19937& rngGen) const
-		{
-			std::uniform_real_distribution<float> distribution(floatRange.inclusiveMin, floatRange.inclusiveMax);
-			return distribution(rngGen);
 		}
 	};
 
@@ -122,10 +107,10 @@ namespace
 	}
 
 
-	template<int32_t bit_count>
+	template<int32_t bit_c>
 	struct bits
 	{
-		static const int32_t bit_count = bit_count;
+		static const int32_t bit_count = bit_c;
 	};
 
 	struct explicit_dst_reg {};
@@ -248,29 +233,13 @@ namespace
 		using type = std::function<Ret(typename std::tuple_element<Is, Args>::type ...)>;
 	};
 
-	template<int32_t size>
-	std::string string_join(const std::array<std::string, size>& strs, std::string delim)
-	{
-		std::string joined = "";
-		if constexpr (size > 0)
-		{
-			for (size_t i = 0; i < strs.size() - 1; i++)
-			{
-				joined += strs[i] + ", ";
-			}
-			joined += strs[strs.size() - 1];
-		}
-
-		return joined;
-	}
-
 	template<bool useMakeTests, typename... TArgs>
 	class uni_format : public baseFormat
 	{
 	protected:
 		using FRetReg = typename std::tuple_element<0, decltype(std::tuple_cat(std::conditional_t<reg_dst_filter<TArgs>::value, std::tuple<TArgs>, std::tuple<>>() ...))>::type;
 		using FRet = typename FRetReg::type;
-		using FArgs = decltype(std::tuple_cat(op_src_filter<TArgs>::type() ...));
+		using FArgs = decltype(std::tuple_cat(typename op_src_filter<TArgs>::type() ...));
 		using FType = typename make_func_type<FRet, FArgs, std::tuple_size<FArgs>::value>::type;
 		using FRegs = decltype(std::tuple_cat(std::conditional_t<op_src_filter<TArgs>::value, std::tuple<TArgs>, std::tuple<>>()...));
 	private:
@@ -285,7 +254,7 @@ namespace
 		template<std::size_t I, typename Sources>
 		struct is_source_from_reg
 		{
-			static constexpr bool value = reg_src_filter<std::tuple_element<I, Sources>::type>::value;
+			static constexpr bool value = reg_src_filter<typename std::tuple_element<I, Sources>::type>::value;
 		};
 
 		template<std::size_t I>
@@ -358,10 +327,16 @@ namespace
 			return srcs;
 		}
 
+		template<typename T>
+		T get_random_source_value(std::mt19937& rngGen, const opSource& src) const
+		{
+			return src.getRandom<T>(rngGen);
+		}
+
 		template<std::size_t... Is>
 		FArgs get_random_source_values(std::mt19937& rngGen, std::index_sequence<Is...> _) const
 		{
-			return std::make_tuple(std::get<Is>(sources).getRandom<std::tuple_element<Is, FArgs>::type>(rngGen)...);
+			return std::make_tuple(get_random_source_value<typename std::tuple_element<Is, FArgs>::type>(rngGen, std::get<Is>(sources))...);
 		}
 
 	protected:
@@ -400,9 +375,12 @@ namespace
 		{
 			if constexpr (useMakeTests)
 			{
+				std::string asm_dir = create_dir_if_not_exists(asmfilepath, instrName);
+				std::string uart_dir = create_dir_if_not_exists(expfilepath, instrName);
+
 				for (size_t i = 0; i < testCount; i++)
 				{
-					isaTest test(asmfilepath, expfilepath, instrName + "-" + std::to_string(i));
+					isaTest test(asm_dir, uart_dir, instrName + "-" + std::to_string(i));
 
 					testData tData = setRegistersAndGetInstrData(test, rngGen);
 
@@ -451,30 +429,37 @@ namespace
 		const std::vector<rounding::x86_round_mode>& rounding_modes;
 		using FRet = typename uni_format<false, TArgs...>::FRet;
 		using FType = typename uni_format<false, TArgs...>::FType;
+		using uni_f = uni_format<false, TArgs...>;
 
 	public:
 		uni_float_format(std::string name, const std::vector<rounding::x86_round_mode>& rounding_modes, FType opFunc, TArgs...instr_bits) :
-			uni_format(name, Pipes::First, opFunc, instr_bits...), rounding_modes(rounding_modes)
+			uni_f(name, Pipes::First, opFunc, instr_bits...), rounding_modes(rounding_modes)
 		{}
 
 		void make_single_op_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const override
 		{
 			if constexpr (useMakeTests)
 			{
-				for each (auto x86_round in rounding_modes)
+				for (auto x86_round : rounding_modes)
 				{
 					rounding::patmos_round_mode patmos_round = rounding::x86_to_patmos_round(x86_round);
 					std::string patmos_round_str = rounding::patmos_round_to_string(patmos_round);
 
+					std::string asm_dir = create_dir_if_not_exists(asmfilepath, this->instrName);
+					std::string uart_dir = create_dir_if_not_exists(expfilepath, this->instrName);
+
+					std::string asm_rounding_dir = create_dir_if_not_exists(asm_dir, "rounding_" + patmos_round_str);
+					std::string uart_rounding_dir = create_dir_if_not_exists(uart_dir, "rounding_" + patmos_round_str);
+
 					for (size_t i = 0; i < testCount; i++)
 					{
-						isaTest test(asmfilepath, expfilepath, instrName + "-" + patmos_round_str + "-" + std::to_string(i));
-
-						testData tData = setRegistersAndGetInstrData(test, rngGen);
+						isaTest test(asm_rounding_dir, uart_rounding_dir, this->instrName + "-" + patmos_round_str + "-" + std::to_string(i));
+						typename uni_f::testData tData = this->setRegistersAndGetInstrData(test, rngGen);
 
 						int32_t sfcsr_rounding = static_cast<int32_t>(patmos_round) << 5;
-						test.addInstr("mts sfcsr = " + std::to_string(sfcsr_rounding) + " # clear exceptions and set rounding mode to " + patmos_round_str);
-						test.addInstr(instrName + " " + tData.destReg.regName + " = " + string_join(tData.instr_sources, ", "));
+						test.setRegister("sfcsr", sfcsr_rounding);
+						//test.addInstr("mts sfcsr = " + std::to_string(sfcsr_rounding) + " # clear exceptions and set rounding mode to " + patmos_round_str);
+						test.addInstr(this->instrName + " " + tData.destReg.regName + " = " + string_join(tData.instr_sources, ", "));
 
 						std::fenv_t curr_fenv;
 						if (fegetenv(&curr_fenv) != 0)
@@ -490,7 +475,7 @@ namespace
 							std::runtime_error("Failed to clear floating-point exceptions.");
 						}
 
-						FRet result = std::apply(opFunc, tData.sourceValues);
+						FRet result = std::apply(this->opFunc, tData.sourceValues);
 						int32_t exceptions = fetestexcept(FE_ALL_EXCEPT);
 
 						if (fesetenv(&curr_fenv) != 0)
@@ -511,7 +496,6 @@ namespace
 			}
 		}
 	};
-}
 
 
 
@@ -525,113 +509,114 @@ namespace
 
 
 
-class ALUr_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01000>, reg_dst<reg_type::GPR>, reg_src<reg_type::GPR>, reg_src<reg_type::GPR>, hardcoded_bits<3, 0b000>, instr_dep_bits<4>>
-{
-public:
-	ALUr_format(std::string name, int32_t func, std::function<int32_t(int32_t, int32_t)> funcOp);
-};
-class ALUi_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<2, 0b00>, instr_dep_bits<3>, reg_dst<reg_type::GPR>, reg_src<reg_type::GPR>, unsigned_imm<12, int32_t>>
-{
-public:
-	ALUi_format(std::string name, int32_t func, std::function<int32_t(int32_t, int32_t)> funcOp);
-};
-class ALUl_format : public uni_format<true, hardcoded_bits<1, 1>, pred_reg, hardcoded_bits<5, 0b01000>, reg_dst<reg_type::GPR>, reg_src<reg_type::GPR>, unused_bits<5>, hardcoded_bits<3, 0b000>, instr_dep_bits<4>, signed_imm<32, int32_t>>
-{
-public:
-	ALUl_format(std::string name, int32_t func, std::function<int32_t(int32_t, int32_t)> funcOp);
-};
-class ALUm_format : public uni_format<false, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01000>, unused_bits<5>, reg_src<reg_type::GPR>, reg_src<reg_type::GPR>, hardcoded_bits<3, 0b010>, instr_dep_bits<4>, implicit_dst_regs<mulRes>>
-{
-public:
-	ALUm_format(std::string name, int32_t func, std::function<mulRes(uint32_t, uint32_t)> funcOp);
-
-	void make_single_op_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const override;
-};
-class ALUc_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01000>, unused_bits<2>, reg_dst<reg_type::PR>, reg_src<reg_type::GPR>, reg_src<reg_type::GPR>, hardcoded_bits<3, 0b011>, instr_dep_bits<4>>
-{
-public:
-	ALUc_format(std::string name, int32_t func, std::function<bool(int32_t, int32_t)> funcOp);
-};
-class ALUci_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01000>, unused_bits<2>, reg_dst<reg_type::PR>, reg_src<reg_type::GPR>, unsigned_imm<5, int32_t>, hardcoded_bits<3, 0b110>, instr_dep_bits<4>>
-{
-public:
-	ALUci_format(std::string name, int32_t func, std::function<bool(int32_t, int32_t)> funcOp);
-};
-class ALUp_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01000>, unused_bits<2>, reg_dst<reg_type::PR>, unused_bits<1>, reg_src<reg_type::PR>, unused_bits<1>, reg_src<reg_type::PR>, hardcoded_bits<3, 0b100>, instr_dep_bits<4>>
-{
-public:
-	ALUp_format(std::string name, int32_t func, std::function<bool(bool, bool)> funcOp);
-};
-class ALUb_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01000>, reg_dst<reg_type::GPR>, reg_src<reg_type::GPR>, unsigned_imm<5, int32_t>, hardcoded_bits<3, 0b101>, reg_src<reg_type::PR>>
-{
-public:
-	ALUb_format(std::string name, std::function<int32_t(int32_t, int32_t, bool)> funcOp);
-};
-class SPCt_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01001>, unused_bits<5>, reg_src<reg_type::GPR>, unused_bits<5>, hardcoded_bits<3, 0b010>, reg_dst<reg_type::SPR>>
-{
-public:
-	SPCt_format(std::string name);
-};
-class SPCf_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01001>, reg_dst<reg_type::GPR>, unused_bits<10>, hardcoded_bits<3, 0b011>, reg_src<reg_type::SPR>>
-{
-public:
-	SPCf_format(std::string name);
-};
-
-
-
-
-
-
-static const std::vector<rounding::x86_round_mode> x86_and_patmos_compat_rounding_modes = {
-	rounding::x86_round_mode::RNE,
-	rounding::x86_round_mode::RTZ,
-	rounding::x86_round_mode::RDN,
-	rounding::x86_round_mode::RUP,
-};
-static const std::vector<std::function<void(isaTest&)>> no_special_tests;
-
-
-class FPUr_format : public uni_float_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01101>, reg_dst<reg_type::FPR>, reg_src<reg_type::FPR>, reg_src<reg_type::FPR>, hardcoded_bits<3, 0b000>, instr_dep_bits<4>>
-{
-public:
-	FPUr_format(std::string name, int32_t func, std::function<float(float, float)> funcOp);
-};
-class FPUl_format : public uni_float_format<true, hardcoded_bits<1, 1>, pred_reg, hardcoded_bits<5, 0b01101>, reg_dst<reg_type::FPR>, reg_src<reg_type::FPR>, unused_bits<5>, hardcoded_bits<3, 0b010>, instr_dep_bits<4>, signed_imm<32, float>>
-{
-public:
-	FPUl_format(std::string name, int32_t func, std::function<float(float, float)> funcOp);
-};
-class FPUrs_format : public uni_float_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01101>, reg_dst<reg_type::FPR>, reg_src<reg_type::FPR>, unused_bits<5>, hardcoded_bits<3, 0b011>, instr_dep_bits<4>>
-{
-public:
-	FPUrs_format(std::string name, int32_t func, std::function<float(float)> funcOp);
-};
-class FPUc_format : public uni_float_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01101>, unused_bits<2>, reg_dst<reg_type::PR>, reg_src<reg_type::FPR>, reg_src<reg_type::FPR>, hardcoded_bits<3, 0b001>, instr_dep_bits<4>>
-{
-public:
-	FPUc_format(std::string name, int32_t func, std::function<bool(float, float)> funcOp);
-};
-class FPCt_format : public uni_float_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01110>, reg_dst<reg_type::FPR>, reg_src<reg_type::GPR>, unused_bits<5>, hardcoded_bits<3, 0b000>, instr_dep_bits<4>>
-{
-public:
-	FPCt_format(std::string name, int32_t func, std::function<float(int32_t)> funcOp);
-};
-class FPCf_format : public uni_float_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01110>, reg_dst<reg_type::GPR>, reg_src<reg_type::FPR>, unused_bits<5>, hardcoded_bits<3, 0b001>, instr_dep_bits<4>>
-{
-	const std::vector<std::function<void(isaTest&)>> special_tests;
-
-public:
-	FPCf_format(std::string name, int32_t func, std::function<int32_t(float)> funcOp, const std::vector<std::function<void(isaTest&)>>& special_tests = no_special_tests, const std::vector<rounding::x86_round_mode>& rounding_modes = x86_and_patmos_compat_rounding_modes);
-
-	void make_single_op_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const override
+	class ALUr_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01000>, reg_dst<reg_type::GPR>, reg_src<reg_type::GPR>, reg_src<reg_type::GPR>, hardcoded_bits<3, 0b000>, instr_dep_bits<4>>
 	{
-		uni_float_format::make_single_op_tests(asmfilepath, expfilepath, rngGen, testCount);
+	public:
+		ALUr_format(std::string name, int32_t func, std::function<int32_t(int32_t, int32_t)> funcOp);
+	};
+	class ALUi_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<2, 0b00>, instr_dep_bits<3>, reg_dst<reg_type::GPR>, reg_src<reg_type::GPR>, unsigned_imm<12, int32_t>>
+	{
+	public:
+		ALUi_format(std::string name, int32_t func, std::function<int32_t(int32_t, int32_t)> funcOp);
+	};
+	class ALUl_format : public uni_format<true, hardcoded_bits<1, 1>, pred_reg, hardcoded_bits<5, 0b01000>, reg_dst<reg_type::GPR>, reg_src<reg_type::GPR>, unused_bits<5>, hardcoded_bits<3, 0b000>, instr_dep_bits<4>, signed_imm<32, int32_t>>
+	{
+	public:
+		ALUl_format(std::string name, int32_t func, std::function<int32_t(int32_t, int32_t)> funcOp);
+	};
+	class ALUm_format : public uni_format<false, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01000>, unused_bits<5>, reg_src<reg_type::GPR>, reg_src<reg_type::GPR>, hardcoded_bits<3, 0b010>, instr_dep_bits<4>, implicit_dst_regs<mulRes>>
+	{
+	public:
+		ALUm_format(std::string name, int32_t func, std::function<mulRes(uint32_t, uint32_t)> funcOp);
 
-		for (size_t i = 0; i < special_tests.size(); i++)
+		void make_single_op_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const override;
+	};
+	class ALUc_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01000>, unused_bits<2>, reg_dst<reg_type::PR>, reg_src<reg_type::GPR>, reg_src<reg_type::GPR>, hardcoded_bits<3, 0b011>, instr_dep_bits<4>>
+	{
+	public:
+		ALUc_format(std::string name, int32_t func, std::function<bool(int32_t, int32_t)> funcOp);
+	};
+	class ALUci_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01000>, unused_bits<2>, reg_dst<reg_type::PR>, reg_src<reg_type::GPR>, unsigned_imm<5, int32_t>, hardcoded_bits<3, 0b110>, instr_dep_bits<4>>
+	{
+	public:
+		ALUci_format(std::string name, int32_t func, std::function<bool(int32_t, int32_t)> funcOp);
+	};
+	class ALUp_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01000>, unused_bits<2>, reg_dst<reg_type::PR>, unused_bits<1>, reg_src<reg_type::PR>, unused_bits<1>, reg_src<reg_type::PR>, hardcoded_bits<3, 0b100>, instr_dep_bits<4>>
+	{
+	public:
+		ALUp_format(std::string name, int32_t func, std::function<bool(bool, bool)> funcOp);
+	};
+	class ALUb_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01000>, reg_dst<reg_type::GPR>, reg_src<reg_type::GPR>, unsigned_imm<5, int32_t>, hardcoded_bits<3, 0b101>, reg_src<reg_type::PR>>
+	{
+	public:
+		ALUb_format(std::string name, std::function<int32_t(int32_t, int32_t, bool)> funcOp);
+	};
+	class SPCt_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01001>, unused_bits<5>, reg_src<reg_type::GPR>, unused_bits<5>, hardcoded_bits<3, 0b010>, reg_dst<reg_type::SPR>>
+	{
+	public:
+		SPCt_format(std::string name);
+	};
+	class SPCf_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01001>, reg_dst<reg_type::GPR>, unused_bits<10>, hardcoded_bits<3, 0b011>, reg_src<reg_type::SPR>>
+	{
+	public:
+		SPCf_format(std::string name);
+	};
+
+
+
+
+
+
+	static const std::vector<rounding::x86_round_mode> x86_and_patmos_compat_rounding_modes = {
+		rounding::x86_round_mode::RNE,
+		rounding::x86_round_mode::RTZ,
+		rounding::x86_round_mode::RDN,
+		rounding::x86_round_mode::RUP,
+	};
+	static const std::vector<std::function<void(isaTest&)>> no_special_tests;
+
+
+	class FPUr_format : public uni_float_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01101>, reg_dst<reg_type::FPR>, reg_src<reg_type::FPR>, reg_src<reg_type::FPR>, hardcoded_bits<3, 0b000>, instr_dep_bits<4>>
+	{
+	public:
+		FPUr_format(std::string name, int32_t func, std::function<float(float, float)> funcOp);
+	};
+	class FPUl_format : public uni_float_format<true, hardcoded_bits<1, 1>, pred_reg, hardcoded_bits<5, 0b01101>, reg_dst<reg_type::FPR>, reg_src<reg_type::FPR>, unused_bits<5>, hardcoded_bits<3, 0b010>, instr_dep_bits<4>, signed_imm<32, float>>
+	{
+	public:
+		FPUl_format(std::string name, int32_t func, std::function<float(float, float)> funcOp);
+	};
+	class FPUrs_format : public uni_float_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01101>, reg_dst<reg_type::FPR>, reg_src<reg_type::FPR>, unused_bits<5>, hardcoded_bits<3, 0b011>, instr_dep_bits<4>>
+	{
+	public:
+		FPUrs_format(std::string name, int32_t func, std::function<float(float)> funcOp);
+	};
+	class FPUc_format : public uni_float_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01101>, unused_bits<2>, reg_dst<reg_type::PR>, reg_src<reg_type::FPR>, reg_src<reg_type::FPR>, hardcoded_bits<3, 0b001>, instr_dep_bits<4>>
+	{
+	public:
+		FPUc_format(std::string name, int32_t func, std::function<bool(float, float)> funcOp);
+	};
+	class FPCt_format : public uni_float_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01110>, reg_dst<reg_type::FPR>, reg_src<reg_type::GPR>, unused_bits<5>, hardcoded_bits<3, 0b000>, instr_dep_bits<4>>
+	{
+	public:
+		FPCt_format(std::string name, int32_t func, std::function<float(int32_t)> funcOp);
+	};
+	class FPCf_format : public uni_float_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01110>, reg_dst<reg_type::GPR>, reg_src<reg_type::FPR>, unused_bits<5>, hardcoded_bits<3, 0b001>, instr_dep_bits<4>>
+	{
+		const std::vector<std::function<void(isaTest&)>> special_tests;
+
+	public:
+		FPCf_format(std::string name, int32_t func, std::function<int32_t(float)> funcOp, const std::vector<std::function<void(isaTest&)>>& special_tests = no_special_tests, const std::vector<rounding::x86_round_mode>& rounding_modes = x86_and_patmos_compat_rounding_modes);
+
+		void make_single_op_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const override
 		{
-			isaTest test(asmfilepath, expfilepath, instrName + "-" + std::to_string(i + testCount));
-			special_tests[i](test);
+			uni_float_format::make_single_op_tests(asmfilepath, expfilepath, rngGen, testCount);
+
+			for (size_t i = 0; i < special_tests.size(); i++)
+			{
+				isaTest test(asmfilepath, expfilepath, instrName + "-" + std::to_string(i + testCount));
+				special_tests[i](test);
+			}
 		}
-	}
-};
+	};
+}

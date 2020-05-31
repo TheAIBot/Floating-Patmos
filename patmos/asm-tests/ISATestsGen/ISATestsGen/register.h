@@ -5,27 +5,30 @@
 #include <string>
 #include <cstdint>
 
-struct regInfo
+namespace patmos
 {
-	std::string regName;
-	int32_t regIndex;
-	bool isReadonly;
+	struct regInfo
+	{
+		std::string regName;
+		int32_t regIndex;
+		bool isReadonly;
 
-	regInfo(std::string name, int32_t index, bool isReadonly = false);
+		regInfo(std::string name, int32_t index, bool isReadonly = false);
 
-	std::string getBaseName();
-};
+		std::string getBaseName();
+	};
 
-regInfo getRandomReg(std::mt19937& rngGen, const std::vector<regInfo>& regSrc);
+	regInfo getRandomReg(std::mt19937& rngGen, const std::vector<regInfo>& regSrc);
 
-class registers
-{
-public:
-	static const std::vector<regInfo> GPRs;
-	static const std::vector<regInfo> FPRs;
-	static const std::vector<regInfo> PRs;
-	static const std::vector<regInfo> SPRs;
+	class registers
+	{
+	public:
+		static const std::vector<regInfo> GPRs;
+		static const std::vector<regInfo> FPRs;
+		static const std::vector<regInfo> PRs;
+		static const std::vector<regInfo> SPRs;
 
-private:
-	registers() {}
-};
+	private:
+		registers() {}
+	};
+}
