@@ -87,7 +87,7 @@ int32_t get_leading_zeroes(const int32_t value)
 #ifdef __linux__
 	index = __builtin_ctz(value);
 #elif _WIN32
-	_BitScanForward(&index, mask);
+	_BitScanForward(&index, value);
 #else
 	static_assert(false, R"(Platform was detected as neither linux or windows.
 You need to write the platform specific way to call the bsf instruction here.)");
@@ -1137,7 +1137,15 @@ int main(int argc, char const *argv[])
 				break;
 			}
 
+#ifdef __linux__
 			instr = __builtin_bswap32(instr);
+#elif _WIN32
+			instr = _byteswap_ulong(instr);
+#else
+			static_assert(false, R"(Platform was detected as neither linux or windows.
+You need to write the platform specific way to swap byte order here.)");
+#endif
+
 			instructions->push_back(instr);
 		}
 		

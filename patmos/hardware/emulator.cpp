@@ -526,8 +526,15 @@ static val_t readbin(istream &is, Patmos_t *c)
 
     assert(binbuf.size() < (1 << 18));
 
-    instr = __builtin_bswap32(instr);
-    //std::cout << instr << std::endl;
+#ifdef __linux__
+			instr = __builtin_bswap32(instr);
+#elif _WIN32
+			instr = _byteswap_ulong(instr);
+#else
+			static_assert(false, R"(Platform was detected as neither linux or windows.
+You need to write the platform specific way to swap byte order here.)");
+#endif
+
     binbuf.push_back(instr);
   }
 
