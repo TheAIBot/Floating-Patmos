@@ -147,7 +147,6 @@ namespace patmos
 		valueRange<T> range;
 		op_src(valueRange<T> range) : range(range) {}
 	};
-
 	template<reg_type t> struct reg_src : bits<0> { };
 	template<> struct reg_src<reg_type::GPR> : op_src<int32_t, 5>
 	{
@@ -183,7 +182,7 @@ namespace patmos
 
 	template<int32_t bit_count> struct unused_bits : bits<bit_count> {};
 
-	template<int32_t bit_count, int32_t bit_value> struct hardcoded_bits : bits<bit_count>
+	template<int32_t bit_count, int32_t bit_value> struct const_bits : bits<bit_count>
 	{
 		static_assert((((1 << bit_count) - 1)& bit_value) == bit_value, "Value doesn't fit in bits.");
 		static const int32_t value = bit_value;
@@ -242,7 +241,7 @@ namespace patmos
 	private:
 		static constexpr int32_t func_arg_count = std::tuple_size<FArgs>::value;
 		static constexpr int32_t intr_bit_count = (TArgs::bit_count + ...);
-		static constexpr bool has_long_imm = std::is_same<hardcoded_bits<1, 1>, typename std::tuple_element<0, std::tuple<TArgs...>>::type>::value;
+		static constexpr bool has_long_imm = std::is_same<const_bits<1, 1>, typename std::tuple_element<0, std::tuple<TArgs...>>::type>::value;
 		static constexpr bool has_explicit_dst_reg = std::is_base_of<explicit_dst_reg, FRetReg>::value;
 
 		check_instr_size<has_long_imm, intr_bit_count> _;
@@ -567,54 +566,54 @@ namespace patmos
 
 
 
-	class ALUr_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01000>, reg_dst<reg_type::GPR>, reg_src<reg_type::GPR>, reg_src<reg_type::GPR>, hardcoded_bits<3, 0b000>, instr_dep_bits<4>>
+	class ALUr_format : public uni_format<true, modify_bits<1, 0>, pred_reg, const_bits<5, 0b01000>, reg_dst<reg_type::GPR>, reg_src<reg_type::GPR>, reg_src<reg_type::GPR>, const_bits<3, 0b000>, instr_dep_bits<4>>
 	{
 	public:
 		ALUr_format(std::string name, int32_t func, std::function<int32_t(int32_t, int32_t)> funcOp);
 	};
-	class ALUi_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<2, 0b00>, instr_dep_bits<3>, reg_dst<reg_type::GPR>, reg_src<reg_type::GPR>, unsigned_imm<12, int32_t>>
+	class ALUi_format : public uni_format<true, modify_bits<1, 0>, pred_reg, const_bits<2, 0b00>, instr_dep_bits<3>, reg_dst<reg_type::GPR>, reg_src<reg_type::GPR>, unsigned_imm<12, int32_t>>
 	{
 	public:
 		ALUi_format(std::string name, int32_t func, std::function<int32_t(int32_t, int32_t)> funcOp);
 	};
-	class ALUl_format : public uni_format<true, hardcoded_bits<1, 1>, pred_reg, hardcoded_bits<5, 0b01000>, reg_dst<reg_type::GPR>, reg_src<reg_type::GPR>, unused_bits<5>, hardcoded_bits<3, 0b000>, instr_dep_bits<4>, signed_imm<32, int32_t>>
+	class ALUl_format : public uni_format<true, const_bits<1, 1>, pred_reg, const_bits<5, 0b01000>, reg_dst<reg_type::GPR>, reg_src<reg_type::GPR>, unused_bits<5>, const_bits<3, 0b000>, instr_dep_bits<4>, signed_imm<32, int32_t>>
 	{
 	public:
 		ALUl_format(std::string name, int32_t func, std::function<int32_t(int32_t, int32_t)> funcOp);
 	};
-	class ALUm_format : public uni_format<false, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01000>, unused_bits<5>, reg_src<reg_type::GPR>, reg_src<reg_type::GPR>, hardcoded_bits<3, 0b010>, instr_dep_bits<4>, implicit_dst_regs<mulRes>>
+	class ALUm_format : public uni_format<false, modify_bits<1, 0>, pred_reg, const_bits<5, 0b01000>, unused_bits<5>, reg_src<reg_type::GPR>, reg_src<reg_type::GPR>, const_bits<3, 0b010>, instr_dep_bits<4>, implicit_dst_regs<mulRes>>
 	{
 	public:
 		ALUm_format(std::string name, int32_t func, std::function<mulRes(uint32_t, uint32_t)> funcOp);
 
 		void make_single_op_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const override;
 	};
-	class ALUc_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01000>, unused_bits<2>, reg_dst<reg_type::PR>, reg_src<reg_type::GPR>, reg_src<reg_type::GPR>, hardcoded_bits<3, 0b011>, instr_dep_bits<4>>
+	class ALUc_format : public uni_format<true, modify_bits<1, 0>, pred_reg, const_bits<5, 0b01000>, unused_bits<2>, reg_dst<reg_type::PR>, reg_src<reg_type::GPR>, reg_src<reg_type::GPR>, const_bits<3, 0b011>, instr_dep_bits<4>>
 	{
 	public:
 		ALUc_format(std::string name, int32_t func, std::function<bool(int32_t, int32_t)> funcOp);
 	};
-	class ALUci_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01000>, unused_bits<2>, reg_dst<reg_type::PR>, reg_src<reg_type::GPR>, unsigned_imm<5, int32_t>, hardcoded_bits<3, 0b110>, instr_dep_bits<4>>
+	class ALUci_format : public uni_format<true, modify_bits<1, 0>, pred_reg, const_bits<5, 0b01000>, unused_bits<2>, reg_dst<reg_type::PR>, reg_src<reg_type::GPR>, unsigned_imm<5, int32_t>, const_bits<3, 0b110>, instr_dep_bits<4>>
 	{
 	public:
 		ALUci_format(std::string name, int32_t func, std::function<bool(int32_t, int32_t)> funcOp);
 	};
-	class ALUp_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01000>, unused_bits<2>, reg_dst<reg_type::PR>, unused_bits<1>, reg_src<reg_type::PR>, unused_bits<1>, reg_src<reg_type::PR>, hardcoded_bits<3, 0b100>, instr_dep_bits<4>>
+	class ALUp_format : public uni_format<true, modify_bits<1, 0>, pred_reg, const_bits<5, 0b01000>, unused_bits<2>, reg_dst<reg_type::PR>, unused_bits<1>, reg_src<reg_type::PR>, unused_bits<1>, reg_src<reg_type::PR>, const_bits<3, 0b100>, instr_dep_bits<4>>
 	{
 	public:
 		ALUp_format(std::string name, int32_t func, std::function<bool(bool, bool)> funcOp);
 	};
-	class ALUb_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01000>, reg_dst<reg_type::GPR>, reg_src<reg_type::GPR>, unsigned_imm<5, int32_t>, hardcoded_bits<3, 0b101>, reg_src<reg_type::PR>>
+	class ALUb_format : public uni_format<true, modify_bits<1, 0>, pred_reg, const_bits<5, 0b01000>, reg_dst<reg_type::GPR>, reg_src<reg_type::GPR>, unsigned_imm<5, int32_t>, const_bits<3, 0b101>, reg_src<reg_type::PR>>
 	{
 	public:
 		ALUb_format(std::string name, std::function<int32_t(int32_t, int32_t, bool)> funcOp);
 	};
-	class SPCt_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01001>, unused_bits<5>, reg_src<reg_type::GPR>, unused_bits<5>, hardcoded_bits<3, 0b010>, reg_dst<reg_type::SPR>>
+	class SPCt_format : public uni_format<true, modify_bits<1, 0>, pred_reg, const_bits<5, 0b01001>, unused_bits<5>, reg_src<reg_type::GPR>, unused_bits<5>, const_bits<3, 0b010>, reg_dst<reg_type::SPR>>
 	{
 	public:
 		SPCt_format(std::string name);
 	};
-	class SPCf_format : public uni_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01001>, reg_dst<reg_type::GPR>, unused_bits<10>, hardcoded_bits<3, 0b011>, reg_src<reg_type::SPR>>
+	class SPCf_format : public uni_format<true, modify_bits<1, 0>, pred_reg, const_bits<5, 0b01001>, reg_dst<reg_type::GPR>, unused_bits<10>, const_bits<3, 0b011>, reg_src<reg_type::SPR>>
 	{
 	public:
 		SPCf_format(std::string name);
@@ -634,32 +633,32 @@ namespace patmos
 	static const std::vector<std::function<void(isaTest&)>> no_special_tests;
 
 
-	class FPUr_format : public uni_float_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01101>, reg_dst<reg_type::FPR>, reg_src<reg_type::FPR>, reg_src<reg_type::FPR>, hardcoded_bits<3, 0b000>, instr_dep_bits<4>>
+	class FPUr_format : public uni_float_format<true, modify_bits<1, 0>, pred_reg, const_bits<5, 0b01101>, reg_dst<reg_type::FPR>, reg_src<reg_type::FPR>, reg_src<reg_type::FPR>, const_bits<3, 0b000>, instr_dep_bits<4>>
 	{
 	public:
 		FPUr_format(std::string name, int32_t func, std::function<float(float, float)> funcOp);
 	};
-	class FPUl_format : public uni_float_format<true, hardcoded_bits<1, 1>, pred_reg, hardcoded_bits<5, 0b01101>, reg_dst<reg_type::FPR>, reg_src<reg_type::FPR>, unused_bits<5>, hardcoded_bits<3, 0b010>, instr_dep_bits<4>, signed_imm<32, float>>
+	class FPUl_format : public uni_float_format<true, const_bits<1, 1>, pred_reg, const_bits<5, 0b01101>, reg_dst<reg_type::FPR>, reg_src<reg_type::FPR>, unused_bits<5>, const_bits<3, 0b010>, instr_dep_bits<4>, signed_imm<32, float>>
 	{
 	public:
 		FPUl_format(std::string name, int32_t func, std::function<float(float, float)> funcOp);
 	};
-	class FPUrs_format : public uni_float_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01101>, reg_dst<reg_type::FPR>, reg_src<reg_type::FPR>, unused_bits<5>, hardcoded_bits<3, 0b011>, instr_dep_bits<4>>
+	class FPUrs_format : public uni_float_format<true, modify_bits<1, 0>, pred_reg, const_bits<5, 0b01101>, reg_dst<reg_type::FPR>, reg_src<reg_type::FPR>, unused_bits<5>, const_bits<3, 0b011>, instr_dep_bits<4>>
 	{
 	public:
 		FPUrs_format(std::string name, int32_t func, std::function<float(float)> funcOp);
 	};
-	class FPUc_format : public uni_float_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01101>, unused_bits<2>, reg_dst<reg_type::PR>, reg_src<reg_type::FPR>, reg_src<reg_type::FPR>, hardcoded_bits<3, 0b001>, instr_dep_bits<4>>
+	class FPUc_format : public uni_float_format<true, modify_bits<1, 0>, pred_reg, const_bits<5, 0b01101>, unused_bits<2>, reg_dst<reg_type::PR>, reg_src<reg_type::FPR>, reg_src<reg_type::FPR>, const_bits<3, 0b001>, instr_dep_bits<4>>
 	{
 	public:
 		FPUc_format(std::string name, int32_t func, std::function<bool(float, float)> funcOp);
 	};
-	class FPCt_format : public uni_float_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01110>, reg_dst<reg_type::FPR>, reg_src<reg_type::GPR>, unused_bits<5>, hardcoded_bits<3, 0b000>, instr_dep_bits<4>>
+	class FPCt_format : public uni_float_format<true, modify_bits<1, 0>, pred_reg, const_bits<5, 0b01110>, reg_dst<reg_type::FPR>, reg_src<reg_type::GPR>, unused_bits<5>, const_bits<3, 0b000>, instr_dep_bits<4>>
 	{
 	public:
 		FPCt_format(std::string name, int32_t func, std::function<float(int32_t)> funcOp);
 	};
-	class FPCf_format : public uni_float_format<true, modify_bits<1, 0>, pred_reg, hardcoded_bits<5, 0b01110>, reg_dst<reg_type::GPR>, reg_src<reg_type::FPR>, unused_bits<5>, hardcoded_bits<3, 0b001>, instr_dep_bits<4>>
+	class FPCf_format : public uni_float_format<true, modify_bits<1, 0>, pred_reg, const_bits<5, 0b01110>, reg_dst<reg_type::GPR>, reg_src<reg_type::FPR>, unused_bits<5>, const_bits<3, 0b001>, instr_dep_bits<4>>
 	{
 		const std::vector<std::function<void(isaTest&)>> special_tests;
 

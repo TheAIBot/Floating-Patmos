@@ -23,11 +23,11 @@ namespace patmos
 		name, Pipes::Both, funcOp,
 		modify_bits<1, 0>(), 
 		pred_reg(), 
-		hardcoded_bits<5, 0b01000>(), 
+		const_bits<5, 0b01000>(),
 		reg_dst<reg_type::GPR>(), 
 		reg_src<reg_type::GPR>(wholeIntRange), 
 		reg_src<reg_type::GPR>(wholeIntRange), 
-		hardcoded_bits<3, 0b000>(), 
+		const_bits<3, 0b000>(),
 		instr_dep_bits<4>(func))
 	{}
 
@@ -35,7 +35,7 @@ namespace patmos
 		name, Pipes::Both, funcOp,
 		modify_bits<1, 0>(), 
 		pred_reg(), 
-		hardcoded_bits<2, 0b00>(), 
+		const_bits<2, 0b00>(),
 		instr_dep_bits<3>(func),
 		reg_dst<reg_type::GPR>(),
 		reg_src<reg_type::GPR>(wholeIntRange),
@@ -44,13 +44,13 @@ namespace patmos
 
 	ALUl_format::ALUl_format(std::string name, int32_t func, std::function<int32_t(int32_t, int32_t)> funcOp) : uni_format(
 		name, Pipes::First, funcOp,
-		hardcoded_bits<1, 1>(),
+		const_bits<1, 1>(),
 		pred_reg(),
-		hardcoded_bits<5, 0b01000>(),
+		const_bits<5, 0b01000>(),
 		reg_dst<reg_type::GPR>(),
 		reg_src<reg_type::GPR>(wholeIntRange),
 		unused_bits<5>(),
-		hardcoded_bits<3, 0b000>(),
+		const_bits<3, 0b000>(),
 		instr_dep_bits<4>(func),
 		signed_imm<32, int32_t>(wholeIntRange))
 	{}
@@ -59,11 +59,11 @@ namespace patmos
 		name, Pipes::First, funcOp,
 		modify_bits<1, 0>(),
 		pred_reg(),
-		hardcoded_bits<5, 0b01000>(),
+		const_bits<5, 0b01000>(),
 		unused_bits<5>(),
 		reg_src<reg_type::GPR>(wholeIntRange),
 		reg_src<reg_type::GPR>(wholeIntRange),
-		hardcoded_bits<3, 0b010>(),
+		const_bits<3, 0b010>(),
 		instr_dep_bits<4>(func),
 		implicit_dst_regs<mulRes>())
 	{}
@@ -93,12 +93,12 @@ namespace patmos
 		name, Pipes::Both, funcOp,
 		modify_bits<1, 0>(),
 		pred_reg(),
-		hardcoded_bits<5, 0b01000>(),
+		const_bits<5, 0b01000>(),
 		unused_bits<2>(),
 		reg_dst<reg_type::PR>(),
 		reg_src<reg_type::GPR>(wholeIntRange),
 		reg_src<reg_type::GPR>(wholeIntRange),
-		hardcoded_bits<3, 0b011>(),
+		const_bits<3, 0b011>(),
 		instr_dep_bits<4>(func))
 	{}
 
@@ -106,12 +106,12 @@ namespace patmos
 		name, Pipes::Both, funcOp,
 		modify_bits<1, 0>(),
 		pred_reg(),
-		hardcoded_bits<5, 0b01000>(),
+		const_bits<5, 0b01000>(),
 		unused_bits<2>(),
 		reg_dst<reg_type::PR>(),
 		reg_src<reg_type::GPR>(wholeIntRange),
 		unsigned_imm<5, int32_t>(valueRange<int32_t>(0, (1 << 5) - 1)),
-		hardcoded_bits<3, 0b110>(),
+		const_bits<3, 0b110>(),
 		instr_dep_bits<4>(func))
 	{}
 
@@ -119,14 +119,14 @@ namespace patmos
 		name, Pipes::Both, funcOp,
 		modify_bits<1, 0>(),
 		pred_reg(),
-		hardcoded_bits<5, 0b01000>(),
+		const_bits<5, 0b01000>(),
 		unused_bits<2>(),
 		reg_dst<reg_type::PR>(),
 		unused_bits<1>(),
 		reg_src<reg_type::PR>(),
 		unused_bits<1>(),
 		reg_src<reg_type::PR>(),
-		hardcoded_bits<3, 0b100>(),
+		const_bits<3, 0b100>(),
 		instr_dep_bits<4>(func))
 	{}
 
@@ -134,11 +134,11 @@ namespace patmos
 		name, Pipes::Both, funcOp,
 		modify_bits<1, 0>(),
 		pred_reg(),
-		hardcoded_bits<5, 0b01000>(),
+		const_bits<5, 0b01000>(),
 		reg_dst<reg_type::GPR>(),
 		reg_src<reg_type::GPR>(wholeIntRange),
 		unsigned_imm<5, int32_t>(valueRange<int32_t>(0, (1 << 5) - 1)),
-		hardcoded_bits<3, 0b101>(),
+		const_bits<3, 0b101>(),
 		reg_src<reg_type::PR>())
 	{}
 
@@ -146,11 +146,11 @@ namespace patmos
 		name, Pipes::Both, [](int32_t a) { return a; },
 		modify_bits<1, 0>(), 
 		pred_reg(), 
-		hardcoded_bits<5, 0b01001>(),
+		const_bits<5, 0b01001>(),
 		unused_bits<5>(),
 		reg_src<reg_type::GPR>(wholeIntRange),
 		unused_bits<5>(),
-		hardcoded_bits<3, 0b010>(),
+		const_bits<3, 0b010>(),
 		reg_dst<reg_type::SPR>())
 	{}
 
@@ -158,10 +158,10 @@ namespace patmos
 		name, Pipes::Both, [](int32_t a) { return a; },
 		modify_bits<1, 0>(), 
 		pred_reg(),
-		hardcoded_bits<5, 0b01001>(),
+		const_bits<5, 0b01001>(),
 		reg_dst<reg_type::GPR>(),
 		unused_bits<10>(),
-		hardcoded_bits<3, 0b011>(),
+		const_bits<3, 0b011>(),
 		reg_src<reg_type::SPR>(wholeIntRange))
 	{}
 
@@ -173,23 +173,23 @@ namespace patmos
 		name, x86_and_patmos_compat_rounding_modes, funcOp,
 		modify_bits<1, 0>(),
 		pred_reg(),
-		hardcoded_bits<5, 0b01101>(),
+		const_bits<5, 0b01101>(),
 		reg_dst<reg_type::FPR>(),
 		reg_src<reg_type::FPR>(floatRange1000),
 		reg_src<reg_type::FPR>(floatRange1000),
-		hardcoded_bits<3, 0b000>(),
+		const_bits<3, 0b000>(),
 		instr_dep_bits<4>(func))
 	{}
 
 	FPUl_format::FPUl_format(std::string name, int32_t func, std::function<float(float, float)> funcOp) : uni_float_format(
 		name, x86_and_patmos_compat_rounding_modes, funcOp,
-		hardcoded_bits<1, 1>(),
+		const_bits<1, 1>(),
 		pred_reg(),
-		hardcoded_bits<5, 0b01101>(),
+		const_bits<5, 0b01101>(),
 		reg_dst<reg_type::FPR>(),
 		reg_src<reg_type::FPR>(floatRange1000),
 		unused_bits<5>(),
-		hardcoded_bits<3, 0b010>(),
+		const_bits<3, 0b010>(),
 		instr_dep_bits<4>(func),
 		signed_imm<32, float>(floatRange1000))
 	{}
@@ -198,11 +198,11 @@ namespace patmos
 		name, x86_and_patmos_compat_rounding_modes, funcOp,
 		modify_bits<1, 0>(),
 		pred_reg(),
-		hardcoded_bits<5, 0b01101>(),
+		const_bits<5, 0b01101>(),
 		reg_dst<reg_type::FPR>(),
 		reg_src<reg_type::FPR>(floatRange1000),
 		unused_bits<5>(),
-		hardcoded_bits<3, 0b011>(),
+		const_bits<3, 0b011>(),
 		instr_dep_bits<4>(func))
 	{}
 
@@ -210,12 +210,12 @@ namespace patmos
 		name, x86_and_patmos_compat_rounding_modes, funcOp,
 		modify_bits<1, 0>(),
 		pred_reg(),
-		hardcoded_bits<5, 0b01101>(),
+		const_bits<5, 0b01101>(),
 		unused_bits<2>(),
 		reg_dst<reg_type::PR>(),
 		reg_src<reg_type::FPR>(floatRange1000),
 		reg_src<reg_type::FPR>(floatRange1000),
-		hardcoded_bits<3, 0b001>(),
+		const_bits<3, 0b001>(),
 		instr_dep_bits<4>(func))
 	{}
 
@@ -223,11 +223,11 @@ namespace patmos
 		name, x86_and_patmos_compat_rounding_modes, funcOp,
 		modify_bits<1, 0>(),
 		pred_reg(),
-		hardcoded_bits<5, 0b01110>(),
+		const_bits<5, 0b01110>(),
 		reg_dst<reg_type::FPR>(),
 		reg_src<reg_type::GPR>(wholeIntRange),
 		unused_bits<5>(),
-		hardcoded_bits<3, 0b000>(),
+		const_bits<3, 0b000>(),
 		instr_dep_bits<4>(func))
 	{}
 
@@ -235,11 +235,11 @@ namespace patmos
 		name, x86_and_patmos_compat_rounding_modes, funcOp,
 		modify_bits<1, 0>(),
 		pred_reg(),
-		hardcoded_bits<5, 0b01110>(),
+		const_bits<5, 0b01110>(),
 		reg_dst<reg_type::GPR>(),
 		reg_src<reg_type::FPR>(floatRange1000),
 		unused_bits<5>(),
-		hardcoded_bits<3, 0b001>(),
+		const_bits<3, 0b001>(),
 		instr_dep_bits<4>(func)), special_tests(special_tests)
 	{}
 
