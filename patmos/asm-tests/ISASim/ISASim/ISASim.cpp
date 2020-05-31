@@ -15,6 +15,9 @@
 #include <cfenv>
 #include "ISASim.h"
 
+#pragma STDC FENV_ACCESS ON
+#pragma fenv_access (on)
+
 int32_t classifyFloat(float a)
 {
 	int32_t ai = reinterpret_cast<int32_t&>(a);
@@ -31,6 +34,94 @@ int32_t classifyFloat(float a)
 		   (!std::signbit(a) && std::isnormal(a)) << 1 |
 		   (!std::signbit(a) && std::isinf(a)) << 0;
 }
+
+enum class patmos_round_mode
+{
+	RNE = 0b000,
+	RTZ = 0b001,
+	RDN = 0b010,
+	RUP = 0b011,
+	RMM = 0b100
+};
+
+enum class x86_round_mode
+{
+	RNE = FE_TONEAREST,
+	RTZ = FE_TOWARDZERO,
+	RDN = FE_DOWNWARD,
+	RUP = FE_UPWARD
+};
+
+
+x86_round_mode patmos_to_x86_round(const patmos_round_mode round)
+{
+	switch (round)
+	{
+	case patmos_round_mode::RNE:
+		return x86_round_mode::RNE;
+	case patmos_round_mode::RTZ:
+		return x86_round_mode::RTZ;
+	case patmos_round_mode::RDN:
+		return x86_round_mode::RDN;
+	case patmos_round_mode::RUP:
+		return x86_round_mode::RUP;
+	case patmos_round_mode::RMM:
+		throw std::runtime_error("x86 has no rounding mode which is equivalent to the patmos RMM rounding mode.");
+	default:
+		throw std::runtime_error("Invalid patmos rounding mode. Mode: " + std::to_string((int32_t)round));
+	}
+}
+
+enum class patmos_exceptions
+{
+	NV = 0b10000,
+	DZ = 0b01000,
+	OF = 0b00100,
+	UF = 0b00010,
+	NX = 0b00001,
+};
+
+int32_t get_leading_zeroes(const int32_t value)
+{
+	unsigned long index;
+#ifdef __linux__
+	index = __builtin_ctz(value);
+#elif _WIN32
+	_BitScanForward(&index, mask);
+#else
+	static_assert(false, R"(Platform was detected as neither linux or windows.
+You need to write the platform specific way to call the bsf instruction here.)");
+#endif
+	return index;
+}
+
+int32_t get_leading_zeroes(const patmos_exceptions ex)
+{
+	return get_leading_zeroes((int32_t)ex);
+}
+
+int32_t x86_to_patmos_exceptions(const std::fexcept_t& ex)
+{
+	return 
+		(((ex & FE_INVALID) >> get_leading_zeroes(FE_INVALID)) << get_leading_zeroes(patmos_exceptions::NV)) |
+		(((ex & FE_DIVBYZERO) >> get_leading_zeroes(FE_DIVBYZERO)) << get_leading_zeroes(patmos_exceptions::DZ)) |
+		(((ex & FE_OVERFLOW) >> get_leading_zeroes(FE_OVERFLOW)) << get_leading_zeroes(patmos_exceptions::OF)) |
+		(((ex & FE_UNDERFLOW) >> get_leading_zeroes(FE_UNDERFLOW)) << get_leading_zeroes(patmos_exceptions::UF)) |
+		(((ex & FE_INEXACT) >> get_leading_zeroes(FE_INEXACT)) << get_leading_zeroes(patmos_exceptions::NX));
+}
+
+std::fexcept_t patmos_to_x86_exceptions(const int32_t ex)
+{
+	return  (std::fexcept_t)(
+		(((ex & (int32_t)patmos_exceptions::NV) >> get_leading_zeroes(patmos_exceptions::NV)) << get_leading_zeroes(FE_INVALID)) |
+		(((ex & (int32_t)patmos_exceptions::DZ) >> get_leading_zeroes(patmos_exceptions::DZ)) << get_leading_zeroes(FE_DIVBYZERO)) |
+		(((ex & (int32_t)patmos_exceptions::OF) >> get_leading_zeroes(patmos_exceptions::OF)) << get_leading_zeroes(FE_OVERFLOW)) |
+		(((ex & (int32_t)patmos_exceptions::UF) >> get_leading_zeroes(patmos_exceptions::UF)) << get_leading_zeroes(FE_UNDERFLOW)) |
+		(((ex & (int32_t)patmos_exceptions::NX) >> get_leading_zeroes(patmos_exceptions::NX)) << get_leading_zeroes(FE_INEXACT)));
+}
+
+
+
 
 enum class InstrFormat
 {
@@ -157,6 +248,7 @@ private:
 	int32_t PC;
 	int32_t Base;
 	bool Verbose;
+	std::fenv_t fp_env;
 
 	uint32_t getGPR(int32_t gpr) { return GPRs[gpr]; }
 	void setGPR(int32_t gpr, uint32_t value) 
@@ -172,7 +264,8 @@ private:
 	{ 
 		if (prr == 0)
 		{
-			throw std::runtime_error("Tried to write to p0");
+			return;
+			//throw std::runtime_error("Tried to write to p0");
 		}
 		PRRs = (PRRs & (~(1 << prr))) | (value << prr); 
 	}
@@ -229,6 +322,49 @@ private:
 	bool isBundle(uint32_t instr)
 	{
 		return (instr & 0x80000000) != 0;
+	}
+
+	patmos_round_mode get_fp_rounding_mode()
+	{
+		return (patmos_round_mode)getInstrPart(getSPR(1), 0b00000000'00000000'00000000'11100000);
+	}
+
+	int32_t get_fp_exceptions()
+	{
+		return getInstrPart(getSPR(1), 0b00000000'00000000'00000000'00011111);
+	}
+
+	void save_and_set_fp_env()
+	{
+		if (fegetenv(&fp_env) != 0)
+		{
+			std::runtime_error("Failed to store the current floating-point environment.");
+		}
+		if (fesetround((int32_t)patmos_to_x86_round(get_fp_rounding_mode())) != 0)
+		{
+			std::runtime_error("Failed to set the floating-point rounding mode.");
+		}
+		std::fexcept_t patmos_exceptions = patmos_to_x86_exceptions(get_fp_exceptions());
+		if (fesetexceptflag(&patmos_exceptions, FE_ALL_EXCEPT) != 0)
+		{
+			std::runtime_error("Failed to set floating-point exceptions.");
+		}
+	}
+
+	void restore_fp_env()
+	{
+		std::fexcept_t x86_exceptions;
+		if (fegetexceptflag(&x86_exceptions, FE_ALL_EXCEPT) != 0)
+		{
+			std::runtime_error("Failed to get floating-point exceptions.");
+		}
+		int32_t patmos_exceptions = x86_to_patmos_exceptions(x86_exceptions);
+		setSPR(1, getSPR(1) | patmos_exceptions);
+		
+		if (fesetenv(&fp_env) != 0)
+		{
+			std::runtime_error("Failed to restore the floating-point environment.");
+		}
 	}
 
 public:
@@ -809,6 +945,7 @@ private:
 			}
 			break;
 		case InstrFormat::FPUr:
+			save_and_set_fp_env();
 			switch (fpuFunc)
 			{
 			case 0b0000:
@@ -833,11 +970,14 @@ private:
 				setFPR(rd, std::copysignf(fpuOp1, (std::signbit(fpuOp1) != std::signbit(fpuOp2)) ? -0.0f : +0.0f));
 				break;
 			default:
+				restore_fp_env();
 				throw std::runtime_error("Invalid FPUr func: " + std::to_string(fpuFunc));
 			}
 			PC++;
+			restore_fp_env();
 			break;
 		case InstrFormat::FPUl:
+			save_and_set_fp_env();
 			switch (fpuFunc)
 			{
 			case 0b0000:
@@ -853,22 +993,28 @@ private:
 				setFPR(rd, fpuOp1 / fpuOp2);
 				break;
 			default:
+				restore_fp_env();
 				throw std::runtime_error("Invalid FPUl func: " + std::to_string(fpuFunc));
 			}
 			PC += 2;
+			restore_fp_env();
 			break;
 		case InstrFormat::FPUrs:
+			save_and_set_fp_env();
 			switch (fpuFunc)
 			{
 			case 0b0000:
 				setFPR(rd, std::sqrt(fpuOp1));
 				break;
 			default:
+				restore_fp_env();
 				throw std::runtime_error("Invalid FPUrs func: " + std::to_string(fpuFunc));
 			}
 			PC++;
+			restore_fp_env();
 			break;
 		case InstrFormat::FPCt:
+			save_and_set_fp_env();
 			switch (fpuFunc)
 			{
 			case 0b0000:
@@ -884,11 +1030,14 @@ private:
             }
 				break;
 			default:
+				restore_fp_env();
 				throw std::runtime_error("Invalid FPCt func: " + std::to_string(fpuFunc));
 			}
 			PC++;
+			restore_fp_env();
 			break;
 		case InstrFormat::FPCf:
+			save_and_set_fp_env();
 			switch (fpuFunc)
 			{
 			case 0b0000:
@@ -907,11 +1056,14 @@ private:
 				setGPR(rd, classifyFloat(getFPR(rs1)));
 				break;
 			default:
+				restore_fp_env();
 				throw std::runtime_error("Invalid FPCf func: " + std::to_string(fpuFunc));
 			}
 			PC++;
+			restore_fp_env();
 			break;
 		case InstrFormat::FPUc:
+			save_and_set_fp_env();
 			switch (fpuFunc)
 			{
 			case 0b0000:
@@ -924,9 +1076,11 @@ private:
 				setPRR(pd, fpuOp1 <= fpuOp2);
 				break;
 			default:
-				break;
+				restore_fp_env();
+				throw std::runtime_error("Invalid FPUc func: " + std::to_string(fpuFunc));
 			}
 			PC++;
+			restore_fp_env();
 			break;
 		default:
 			throw std::runtime_error("Invalid instruction format.");

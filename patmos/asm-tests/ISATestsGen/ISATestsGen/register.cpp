@@ -3,7 +3,8 @@
 
 namespace patmos
 {
-	regInfo::regInfo(std::string name, int32_t index, bool isReadonly) : regName(name), regIndex(index), isReadonly(isReadonly)
+	regInfo::regInfo(std::string name, int32_t index, bool isReadonly, int32_t readonly_value) : 
+		regName(name), regIndex(index), isReadonly(isReadonly), readonly_value(readonly_value)
 	{}
 
 	std::string regInfo::getBaseName()
@@ -18,7 +19,7 @@ namespace patmos
 	}
 
 	const std::vector<regInfo> registers::GPRs = {
-		regInfo("r0", 0, true),
+		regInfo("r0", 0, true, 0),
 		regInfo("r1", 1),
 		regInfo("r2", 2),
 		regInfo("r3", 3),
@@ -88,7 +89,7 @@ namespace patmos
 	};
 
 	const std::vector<regInfo> registers::PRs = {
-		regInfo("p0", 0, true),
+		regInfo("p0", 0, true, 1),
 		regInfo("p1", 1),
 		regInfo("p2", 2),
 		regInfo("p3", 3),

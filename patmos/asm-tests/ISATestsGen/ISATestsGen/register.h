@@ -12,8 +12,9 @@ namespace patmos
 		std::string regName;
 		int32_t regIndex;
 		bool isReadonly;
+		int32_t readonly_value;
 
-		regInfo(std::string name, int32_t index, bool isReadonly = false);
+		regInfo(std::string name, int32_t index, bool isReadonly = false, int32_t readonly_value = 0);
 
 		std::string getBaseName();
 	};

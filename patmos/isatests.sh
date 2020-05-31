@@ -2,7 +2,7 @@
 
 TESTS_DIR=$(pwd)/asm-tests
 ISA_GEN_DIR=$TESTS_DIR/ISATestsGen
-ISA_SIM_DIR=$TESTS_DIR/ISASim/ISASim
+ISA_SIM_DIR=$TESTS_DIR/ISASim
 PAASM_BUILD_DIR=$(pwd)/simulator/build
 PAASM_EXE_DIR=$PAASM_BUILD_DIR/src
 EMU_EXE_DIR=$(pwd)/hardware/build
@@ -88,13 +88,13 @@ do
         
         #get isa sim output
         #echo -n "Running simulator:         "
-        if $ISA_SIM_DIR/ISASim $TESTS_BIN_DIR/$test_name/$tmpfilename.bin $TESTS_SIM_ACTUAL_DIR/$test_name/$tmpfilename.uart >> $logfile 2>&1 ; 
+        if $ISA_SIM_DIR/ISASim/ISASim $TESTS_BIN_DIR/$test_name/$tmpfilename.bin $TESTS_SIM_ACTUAL_DIR/$test_name/$tmpfilename.uart >> $logfile 2>&1 ; 
         then
             #echo -n "-"
             echo -n ""
         else
-            #echo " Failed to simulate binary"
             echo -n "S"
+            echo " Failed to simulate binary" >> $logfile
             tests_fail=$(($tests_fail+1))
             continue
         fi
@@ -110,6 +110,7 @@ do
             #echo " Simulator gave an incorrect result"
             echo -n "S"
             
+            echo "Simulator output is incorrect:" >> $logfile
             echo "expected:" >> $logfile
             xxd -b -c 4 $TESTS_EXPECTED_DIR/$test_name/$tmpfilename.uart >> $logfile 2>&1
             echo "actual:" >> $logfile
@@ -132,6 +133,7 @@ do
             #echo " Emulator gave an incorrect result"
             echo -n "E"
             
+            echo "Emulator output is incorrect:" >> $logfile
             echo "expected:" >> $logfile
             xxd -b -c 4 $TESTS_EXPECTED_DIR/$test_name/$tmpfilename.uart >> $logfile 2>&1
             echo "actual:" >> $logfile

@@ -8,6 +8,7 @@
 #include <array>
 #include <tuple>
 #include <cstdint>
+#include <cfenv>
 #include <stdexcept>
 #include <functional>
 #include <numeric>
@@ -260,12 +261,17 @@ namespace patmos
 		template<std::size_t I>
 		std::string setRegAndGetsourceAsString(isaTest& test, std::mt19937& rngGen, FArgs& sourceValues) const
 		{
-			decltype(std::get<I>(sourceValues)) value = std::get<I>(sourceValues);
+			decltype(std::get<I>(sourceValues))& value = std::get<I>(sourceValues);
 			if constexpr (is_source_from_reg<I, FRegs>::value)
 			{
 				const opSource& src = std::get<I>(sources);
 				regInfo rndReg = src.getRandomRegister(rngGen);
 				test.setRegister(rndReg.regName, value);
+				if (rndReg.isReadonly)
+				{
+					value = static_cast<typename std::decay<decltype(value)>::type>(rndReg.readonly_value);
+				}
+				
 				return rndReg.regName;
 			}
 			else
@@ -339,6 +345,31 @@ namespace patmos
 			return std::make_tuple(get_random_source_value<typename std::tuple_element<Is, FArgs>::type>(rngGen, std::get<Is>(sources))...);
 		}
 
+		template<std::size_t I>
+		void handle_dup_reg_source(FArgs& sourceValues, std::array<std::string, func_arg_count> instr_sources)
+		{
+			if constexpr (is_source_from_reg<I, FRegs>::value)
+			{
+				for (size_t i = I; i < instr_sources.size(); i++)
+				{
+					/* code */
+				}
+				
+			}
+		}
+
+		template<std::size_t... Is>
+		void handle_dup_reg_sources(FArgs& sourceValues, std::array<std::string, func_arg_count> instr_sources, std::index_sequence<Is...> _) const
+		{
+			auto adwdwa = [&](const std::size_t i) {
+				if ()
+				{
+					/* code */
+				}
+				
+			};
+		}
+
 	protected:
 		FType opFunc;
 		std::array<opSource, func_arg_count> sources;
@@ -386,7 +417,14 @@ namespace patmos
 
 
 					test.addInstr(instrName + " " + tData.destReg.regName + " = " + string_join(tData.instr_sources, ", "));
-					test.expectRegisterValue(tData.destReg.regName, std::apply(opFunc, tData.sourceValues));
+					if (tData.destReg.isReadonly)
+					{
+						test.expectRegisterValue(tData.destReg.regName, tData.destReg.readonly_value);
+					}
+					else
+					{
+						test.expectRegisterValue(tData.destReg.regName, std::apply(opFunc, tData.sourceValues));
+					}
 
 					test.close();
 				}
@@ -454,11 +492,11 @@ namespace patmos
 					for (size_t i = 0; i < testCount; i++)
 					{
 						isaTest test(asm_rounding_dir, uart_rounding_dir, this->instrName + "-" + patmos_round_str + "-" + std::to_string(i));
-						typename uni_f::testData tData = this->setRegistersAndGetInstrData(test, rngGen);
 
 						int32_t sfcsr_rounding = static_cast<int32_t>(patmos_round) << 5;
 						test.setRegister("sfcsr", sfcsr_rounding);
-						//test.addInstr("mts sfcsr = " + std::to_string(sfcsr_rounding) + " # clear exceptions and set rounding mode to " + patmos_round_str);
+
+						typename uni_f::testData tData = this->setRegistersAndGetInstrData(test, rngGen);
 						test.addInstr(this->instrName + " " + tData.destReg.regName + " = " + string_join(tData.instr_sources, ", "));
 
 						std::fenv_t curr_fenv;
@@ -476,15 +514,28 @@ namespace patmos
 						}
 
 						FRet result = std::apply(this->opFunc, tData.sourceValues);
-						int32_t exceptions = fetestexcept(FE_ALL_EXCEPT);
+
+						std::fexcept_t x86_exceptions;
+						if (fegetexceptflag(&x86_exceptions, FE_ALL_EXCEPT) != 0)
+						{
+							std::runtime_error("Failed to get floating-point exceptions.");
+						}
+						int32_t patmos_exceptions = exception::x86_to_patmos_exceptions(x86_exceptions);
 
 						if (fesetenv(&curr_fenv) != 0)
 						{
 							std::runtime_error("Failed to restore the floating-point environment.");
 						}
 
-						test.expectRegisterValue(tData.destReg.regName, result);
-						test.expectRegisterValue("sfcsr", exceptions | sfcsr_rounding);
+						if (tData.destReg.isReadonly)
+						{
+							test.expectRegisterValue(tData.destReg.regName, tData.destReg.readonly_value);
+						}
+						else
+						{
+							test.expectRegisterValue(tData.destReg.regName, result);
+						}
+						test.expectRegisterValue("sfcsr", patmos_exceptions | sfcsr_rounding);
 
 						test.close();
 					}
