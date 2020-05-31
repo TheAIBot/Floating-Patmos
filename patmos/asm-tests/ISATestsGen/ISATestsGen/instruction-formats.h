@@ -345,29 +345,38 @@ namespace patmos
 			return std::make_tuple(get_random_source_value<typename std::tuple_element<Is, FArgs>::type>(rngGen, std::get<Is>(sources))...);
 		}
 
-		template<std::size_t I>
-		void handle_dup_reg_source(FArgs& sourceValues, std::array<std::string, func_arg_count> instr_sources)
+		template<std::size_t... Is>
+		struct partial_index_sequence {};
+
+		template<std::size_t Start, std::size_t FI, std::size_t... Is>
+		struct make_partial_index_sequence : make_partial_index_sequence<Start - 1, Is...>
+		{};
+		template<std::size_t... Is>
+		struct make_partial_index_sequence<0, Is...> : partial_index_sequence<Is...>
+		{};
+
+		template<std::size_t Ia, std::size_t Ib>
+		void if_equal_replace_source_value(FArgs& sourceValues, std::array<std::string, func_arg_count>& instr_sources) const
+		{
+			if (instr_sources[Ia] == instr_sources[Ib])
+			{
+				std::get<Ia>(sourceValues) = std::get<Ib>(sourceValues);
+			}
+		}
+
+		template<std::size_t I, std::size_t... PIs>
+		void handle_dup_reg_source(FArgs& sourceValues, std::array<std::string, func_arg_count>& instr_sources, partial_index_sequence<PIs...> _) const
 		{
 			if constexpr (is_source_from_reg<I, FRegs>::value)
 			{
-				for (size_t i = I; i < instr_sources.size(); i++)
-				{
-					/* code */
-				}
-				
+				(if_equal_replace_source_value<I, PIs>(sourceValues, instr_sources), ...);
 			}
 		}
 
 		template<std::size_t... Is>
-		void handle_dup_reg_sources(FArgs& sourceValues, std::array<std::string, func_arg_count> instr_sources, std::index_sequence<Is...> _) const
+		void handle_dup_reg_sources(FArgs& sourceValues, std::array<std::string, func_arg_count>& instr_sources, std::index_sequence<Is...> _) const
 		{
-			auto adwdwa = [&](const std::size_t i) {
-				if ()
-				{
-					/* code */
-				}
-				
-			};
+			(handle_dup_reg_source<Is>(sourceValues, instr_sources, make_partial_index_sequence<Is, Is...>()), ...);
 		}
 
 	protected:
@@ -394,6 +403,8 @@ namespace patmos
 			}
 			tData.sourceValues = get_random_source_values(rngGen, std::make_index_sequence<func_arg_count>());
 			tData.instr_sources = setRegsAndGetSourcesAsStrings(test, rngGen, tData.sourceValues, std::make_index_sequence<func_arg_count>());
+
+			handle_dup_reg_sources(tData.sourceValues, tData.instr_sources, std::make_index_sequence<func_arg_count>());
 
 			return tData;
 		}
