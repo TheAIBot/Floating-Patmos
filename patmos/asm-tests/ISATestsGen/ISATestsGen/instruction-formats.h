@@ -508,15 +508,15 @@ namespace patmos
 						std::fenv_t curr_fenv;
 						if (fegetenv(&curr_fenv) != 0)
 						{
-							std::runtime_error("Failed to store the current floating-point environment.");
+							throw std::runtime_error("Failed to store the current floating-point environment.");
 						}
 						if (fesetround((int32_t)x86_round) != 0)
 						{
-							std::runtime_error("Failed to set the floating-point rounding mode.");
+							throw std::runtime_error("Failed to set the floating-point rounding mode.");
 						}
 						if (feclearexcept(FE_ALL_EXCEPT) != 0)
 						{
-							std::runtime_error("Failed to clear floating-point exceptions.");
+							throw std::runtime_error("Failed to clear floating-point exceptions.");
 						}
 
 						FRet result = std::apply(this->opFunc, tData.sourceValues);
@@ -524,13 +524,13 @@ namespace patmos
 						std::fexcept_t x86_exceptions;
 						if (fegetexceptflag(&x86_exceptions, FE_ALL_EXCEPT) != 0)
 						{
-							std::runtime_error("Failed to get floating-point exceptions.");
+							throw std::runtime_error("Failed to get floating-point exceptions.");
 						}
 						int32_t patmos_exceptions = exception::x86_to_patmos_exceptions(x86_exceptions);
 
 						if (fesetenv(&curr_fenv) != 0)
 						{
-							std::runtime_error("Failed to restore the floating-point environment.");
+							throw std::runtime_error("Failed to restore the floating-point environment.");
 						}
 
 						if (tData.destReg.isReadonly)
