@@ -141,48 +141,44 @@ namespace patmos
 	};
 	struct pred_reg : bits<4> {};
 
-	template<reg_type t> struct reg_src : bits<0> { };
-	template<> struct reg_src<reg_type::GPR> : bits<5>
+	template<typename T, int32_t bit_count> struct op_src : bits<bit_count>
 	{
-		using type = int32_t;
-		valueRange<int32_t> range;
-		reg_src(valueRange<int32_t> range) : range(range) {}
-		reg_src() : range(valueRange<int32_t>(0, 0)) {}
-	};
-	template<> struct reg_src<reg_type::FPR> : bits<5>
-	{
-		using type = float;
-		valueRange<float> range;
-		reg_src(valueRange<float> range) : range(range) {}
-		reg_src() : range(valueRange<float>(0, 0)) {}
-	};
-	template<> struct reg_src<reg_type::SPR> : bits<4>
-	{
-		using type = int32_t;
-		valueRange<int32_t> range;
-		reg_src(valueRange<int32_t> range) : range(range) {}
-		reg_src() : range(valueRange<int32_t>(0, 0)) {}
-	};
-	template<> struct reg_src<reg_type::PR> : bits<4>
-	{
-		using type = bool;
-		valueRange<int32_t> range;
-		reg_src() : range(valueRange<int32_t>(0, 1)) {}
+		using type = T;
+		valueRange<T> range;
+		op_src(valueRange<T> range) : range(range) {}
 	};
 
-	template<int32_t bit_count, typename T> struct signed_imm : bits<bit_count>
+	template<reg_type t> struct reg_src : bits<0> { };
+	template<> struct reg_src<reg_type::GPR> : op_src<int32_t, 5>
 	{
-		using type = T;
-		valueRange<T> range;
-		signed_imm(valueRange<T> range) : range(range) {}
-		signed_imm() : range(valueRange<T>(0, 0)) {}
+		using op_src::op_src;
+		reg_src() : op_src(valueRange<int32_t>(0, 0)) {}
 	};
-	template<int32_t bit_count, typename T> struct unsigned_imm : bits<bit_count>
+	template<> struct reg_src<reg_type::FPR> : op_src<float, 5>
 	{
-		using type = T;
-		valueRange<T> range;
-		unsigned_imm(valueRange<T> range) : range(range) {}
-		unsigned_imm() : range(valueRange<T>(0, 0)) {}
+		using op_src::op_src;
+		reg_src() : op_src(valueRange<float>(0, 0)) {}
+	};
+	template<> struct reg_src<reg_type::SPR> : op_src<int32_t, 4>
+	{
+		using op_src::op_src;
+		reg_src() : op_src(valueRange<int32_t>(0, 0)) {}
+	};
+	template<> struct reg_src<reg_type::PR> : op_src<int32_t, 4>
+	{
+		using op_src::op_src;
+		reg_src() : op_src(valueRange<int32_t>(0, 1)) {}
+	};
+
+	template<int32_t bit_count, typename T> struct signed_imm : op_src<T, bit_count>
+	{
+		using op_src::op_src;
+		signed_imm() : op_src(valueRange<T>(0, 0)) {}
+	};
+	template<int32_t bit_count, typename T> struct unsigned_imm : op_src<T, bit_count>
+	{
+		using op_src::op_src;
+		unsigned_imm() : op_src(valueRange<T>(0, 0)) {}
 	};
 
 	template<int32_t bit_count> struct unused_bits : bits<bit_count> {};
