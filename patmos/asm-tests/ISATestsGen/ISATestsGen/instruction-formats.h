@@ -150,34 +150,34 @@ namespace patmos
 	template<reg_type t> struct reg_src : bits<0> { };
 	template<> struct reg_src<reg_type::GPR> : op_src<int32_t, 5>
 	{
-		using op_src::op_src;
+		using op_src<int32_t, 5>::op_src;
 		reg_src() : op_src(valueRange<int32_t>(0, 0)) {}
 	};
 	template<> struct reg_src<reg_type::FPR> : op_src<float, 5>
 	{
-		using op_src::op_src;
+		using op_src<float, 5>::op_src;
 		reg_src() : op_src(valueRange<float>(0, 0)) {}
 	};
 	template<> struct reg_src<reg_type::SPR> : op_src<int32_t, 4>
 	{
-		using op_src::op_src;
+		using op_src<int32_t, 4>::op_src;
 		reg_src() : op_src(valueRange<int32_t>(0, 0)) {}
 	};
 	template<> struct reg_src<reg_type::PR> : op_src<int32_t, 4>
 	{
-		using op_src::op_src;
+		using op_src<int32_t, 4>::op_src;
 		reg_src() : op_src(valueRange<int32_t>(0, 1)) {}
 	};
 
 	template<int32_t bit_count, typename T> struct signed_imm : op_src<T, bit_count>
 	{
-		using op_src::op_src;
-		signed_imm() : op_src(valueRange<T>(0, 0)) {}
+		using op_src<T, bit_count>::op_src;
+		signed_imm() : op_src<T, bit_count>(valueRange<T>(0, 0)) {}
 	};
 	template<int32_t bit_count, typename T> struct unsigned_imm : op_src<T, bit_count>
 	{
-		using op_src::op_src;
-		unsigned_imm() : op_src(valueRange<T>(0, 0)) {}
+		using op_src<T, bit_count>::op_src;
+		unsigned_imm() : op_src<T, bit_count>(valueRange<T>(0, 0)) {}
 	};
 
 	template<int32_t bit_count> struct unused_bits : bits<bit_count> {};
@@ -344,10 +344,10 @@ namespace patmos
 		struct partial_index_sequence {};
 
 		template<std::size_t Start, std::size_t FI, std::size_t... Is>
-		struct make_partial_index_sequence : make_partial_index_sequence<Start - 1, Is...>
+		struct make_partial_index_sequence : make_partial_index_sequence<Start, Is...>
 		{};
-		template<std::size_t... Is>
-		struct make_partial_index_sequence<0, Is...> : partial_index_sequence<Is...>
+		template<std::size_t Start, std::size_t... Is>
+		struct make_partial_index_sequence<Start, Start, Is...> : partial_index_sequence<Start, Is...>
 		{};
 
 		template<std::size_t Ia, std::size_t Ib>
