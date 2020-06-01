@@ -1,5 +1,6 @@
 
 #include "tester.h"
+#include <sstream>
 
 namespace patmos
 {
@@ -43,18 +44,27 @@ namespace patmos
 		asmFile << instr << '\n';
 	}
 
+	std::string float_to_string(float value)
+	{
+		std::ostringstream out;
+		out.precision(std::numeric_limits<float>::max_digits10);
+		out << std::fixed << value;
+
+		return out.str();
+	}
+
 	void isaTest::setFloatReg(std::string reg, float value)
 	{
-		if (true || std::isnan(value) || std::isinf(value) || std::fpclassify(value) == FP_SUBNORMAL)
-		{
-			addInstr("addl r23 = r0, " + std::to_string(reinterpret_cast<uint32_t&>(value)) + " # " + std::to_string(value));
-			addInstr("fmvis " + reg + " = r23");
-		}
-		else
-		{
+		//if (true || std::isnan(value) || std::isinf(value) || std::fpclassify(value) == FP_SUBNORMAL)
+		//{
+		//	addInstr("addl r23 = r0, " + std::to_string(reinterpret_cast<uint32_t&>(value)) + " # " + std::to_string(value));
+		//	addInstr("fmvis " + reg + " = r23");
+		//}
+		//else
+		//{
 			addInstr("fmvis " + reg + " = r0");
-			addInstr("faddsl " + reg + " = " + reg + ", " + std::to_string(value));
-		}
+			addInstr("faddsl " + reg + " = " + reg + ", " + float_to_string(value));
+		//}
 	}
 
 	void isaTest::setGPReg(std::string reg, int32_t value)
