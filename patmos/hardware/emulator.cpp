@@ -538,10 +538,10 @@ You need to write the platform specific way to swap byte order here.)");
     binbuf.push_back(instr);
   }
 
-  write_extmem((131076 >> 2) - 3, 1000);
-  write_extmem((131076 >> 2) - 2, 1000);
-  write_extmem((131076 >> 2) - 1, 1000);
-  write_extmem((131076 >> 2) - 0, 1000);
+  write_extmem((131076 >> 2) - 3, 50);
+  write_extmem((131076 >> 2) - 2, 50);
+  write_extmem((131076 >> 2) - 1, 50);
+  write_extmem((131076 >> 2) - 0, 50);
   for (size_t i = 0; i < binbuf.size(); i++)
   {
     write_extmem((131076 >> 2) + i + 1, binbuf[i]);
