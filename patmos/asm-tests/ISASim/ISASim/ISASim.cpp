@@ -682,7 +682,7 @@ private:
 			PC++;
 			break;
 		case InstrFormat::ALUb:
-			setGPR(rd, (aluOp1 & ~(1 << immb)) | (alubOp1));
+			setGPR(rd, (aluOp1 & ~(1 << immb)) | (alubOp1 << immb));
 			PC++;
 			break;
 		case InstrFormat::SPCt:
