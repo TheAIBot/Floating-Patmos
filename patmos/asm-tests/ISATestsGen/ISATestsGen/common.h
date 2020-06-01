@@ -26,11 +26,11 @@ namespace patmos
 		std::string joined = "";
 		if constexpr (size > 0)
 		{
-			for (size_t i = 0; i < strs.size() - 1; i++)
+			for (size_t i = 0; i < size - 1; i++)
 			{
 				joined += strs[i] + delim;
 			}
-			joined += strs[strs.size() - 1];
+			joined += strs[size - 1];
 		}
 
 		return joined;
