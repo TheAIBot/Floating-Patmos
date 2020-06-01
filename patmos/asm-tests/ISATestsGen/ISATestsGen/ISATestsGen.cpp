@@ -41,8 +41,8 @@ namespace patmos
 		uint64_t res = catHHLL + catHL + catLH;
 
 		mulRes mRes;
-		mRes.Low = res;
-		mRes.High = res >> 32;
+		mRes.Low = (uint32_t)res;
+		mRes.High = (uint32_t)(res >> 32);
 
 		return mRes;
 	}
@@ -66,8 +66,8 @@ namespace patmos
 		uint64_t res = catHHLL + catHL + catLH;
 
 		mulRes mRes;
-		mRes.Low = res;
-		mRes.High = res >> 32;
+		mRes.Low = (uint32_t)res;
+		mRes.High = (uint32_t)(res >> 32);
 
 		return mRes;
 	}
