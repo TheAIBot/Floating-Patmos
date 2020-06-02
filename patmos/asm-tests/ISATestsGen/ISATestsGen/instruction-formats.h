@@ -262,10 +262,22 @@ namespace patmos
 				const opSource& src = std::get<I>(sources);
 				regInfo rndReg = src.getRandomRegister(rngGen);
 				test.setRegister(rndReg.regName, value);
+				//if register is readonly then the value from it
+				//isn't a random value, but the readonly value
 				if (rndReg.isReadonly)
 				{
 					value = static_cast<typename std::decay<decltype(value)>::type>(rndReg.readonly_value);
 				}
+				
+				if constexpr (std::is_same<reg_src<reg_type::SPR>, typename std::tuple_element<I, FRegs>::type>::value)
+				{
+					//special register s0 isn't readonly, but the first bit of the 
+					//register is so add the value of that to the value of the register
+					if (rndReg.regName == "s0")
+					{
+						value = value | 1;
+					}
+				}				
 				
 				return rndReg.regName;
 			}
@@ -404,6 +416,18 @@ namespace patmos
 			return tData;
 		}
 
+		void set_expected_value(isaTest& test, regInfo& reg, FRet value) const
+		{
+			if (reg.isReadonly)
+			{
+				test.expectRegisterValue(reg.regName, reg.readonly_value);
+			}
+			else
+			{
+				test.expectRegisterValue(reg.regName, value);
+			}
+		}
+
 	public:
 		uni_format(std::string name, Pipes pipe, FType opFunc, TArgs...instr_bits) : baseFormat(name, pipe), opFunc(opFunc), sources(createSources(instr_bits...)), instr_bit_parts(std::make_tuple(instr_bits...))
 		{}
@@ -423,14 +447,7 @@ namespace patmos
 
 
 					test.addInstr(instrName + " " + tData.destReg.regName + " = " + string_join(tData.instr_sources, ", "));
-					if (tData.destReg.isReadonly)
-					{
-						test.expectRegisterValue(tData.destReg.regName, tData.destReg.readonly_value);
-					}
-					else
-					{
-						test.expectRegisterValue(tData.destReg.regName, std::apply(opFunc, tData.sourceValues));
-					}
+					set_expected_value(test, tData.destReg, std::apply(opFunc, tData.sourceValues));
 
 					test.close();
 				}
@@ -533,14 +550,7 @@ namespace patmos
 							throw std::runtime_error("Failed to restore the floating-point environment.");
 						}
 
-						if (tData.destReg.isReadonly)
-						{
-							test.expectRegisterValue(tData.destReg.regName, tData.destReg.readonly_value);
-						}
-						else
-						{
-							test.expectRegisterValue(tData.destReg.regName, result);
-						}
+						this->set_expected_value(test, tData.destReg, result);
 						test.expectRegisterValue("sfcsr", patmos_exceptions | sfcsr_rounding);
 
 						test.close();
