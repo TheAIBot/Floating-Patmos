@@ -669,10 +669,16 @@ namespace patmos
 		{
 			uni_float_format::make_single_op_tests(asmfilepath, expfilepath, rngGen, testCount);
 
-			for (size_t i = 0; i < special_tests.size(); i++)
+			if (special_tests.size() > 0)
 			{
-				isaTest test(asmfilepath, expfilepath, instrName + "-" + std::to_string(i + testCount));
-				special_tests[i](test);
+				std::string asm_dir = create_dir_if_not_exists(asmfilepath, this->instrName + "-special");
+				std::string uart_dir = create_dir_if_not_exists(expfilepath, this->instrName + "-special");
+
+				for (size_t i = 0; i < special_tests.size(); i++)
+				{
+					isaTest test(asm_dir, uart_dir, instrName + "-" + std::to_string(i + testCount));
+					special_tests[i](test);
+				}
 			}
 		}
 	};
