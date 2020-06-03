@@ -1,8 +1,10 @@
 import subprocess
-import filecmp
 import os 
-import asyncio
+import filecmp
 from shutil import copyfile
+import asyncio
+from concurrent.futures import ProcessPoolExecutor
+import multiprocessing
 
 curr_dir = os.getcwd()
 
@@ -52,47 +54,46 @@ subprocess.check_call([os.path.join(isa_gen_dir, "ISATestsGen", "ISATestsGen"), 
 #copyfile(os.path.join(tests_dir, "uartForTests.s"), os.path.join(curr_dir, "asm", "uartForTests.s"))
 #subprocess.check_call(["make", "emulator", "BOOTAPP=uartForTests"])
 
-rate_limit = asyncio.Semaphore(16)
+def run_test(dirpath, filename, test_name):
+    filepath = os.path.join(dirpath, filename)
+    basename = os.path.splitext(filename)[0]
+    log_file = os.path.join(tests_logs_dir, test_name, basename + ".s")
+    file_bin = os.path.join(tests_bin_dir, test_name, basename + ".bin")
+    sim_uart = os.path.join(tests_sim_actual_dir, test_name, basename + ".uart")
+    exp_uart = os.path.join(tests_expected_dir, test_name, basename + ".uart")
+    emu_uart = os.path.join(tests_emu_actual_dir, test_name, basename + ".uart")
 
-async def run_test(dirpath, filename, test_name):
-    async with rate_limit:
-        filepath = os.path.join(dirpath, filename)
-        basename = os.path.splitext(filename)[0]
-        log_file = os.path.join(tests_logs_dir, test_name, basename + ".s")
-        file_bin = os.path.join(tests_bin_dir, test_name, basename + ".bin")
-        sim_uart = os.path.join(tests_sim_actual_dir, test_name, basename + ".uart")
-        exp_uart = os.path.join(tests_expected_dir, test_name, basename + ".uart")
-        emu_uart = os.path.join(tests_emu_actual_dir, test_name, basename + ".uart")
+    os.makedirs(os.path.join(tests_bin_dir, test_name), exist_ok=True)
+    os.makedirs(os.path.join(tests_emu_actual_dir, test_name), exist_ok=True)
+    os.makedirs(os.path.join(tests_sim_actual_dir, test_name), exist_ok=True)
+    os.makedirs(os.path.join(tests_hw_actual_dir, test_name), exist_ok=True)
+    os.makedirs(os.path.join(tests_logs_dir, test_name), exist_ok=True)
 
-        os.makedirs(os.path.join(tests_bin_dir, test_name), exist_ok=True)
-        os.makedirs(os.path.join(tests_emu_actual_dir, test_name), exist_ok=True)
-        os.makedirs(os.path.join(tests_sim_actual_dir, test_name), exist_ok=True)
-        os.makedirs(os.path.join(tests_hw_actual_dir, test_name), exist_ok=True)
-        os.makedirs(os.path.join(tests_logs_dir, test_name), exist_ok=True)
+    #write everything to log file
+    with open(log_file, "w") as log_handle:
+        #compile test
+        if subprocess.call([paasm_exe, filepath, file_bin], stdin=subprocess.DEVNULL, stdout=log_handle, stderr=log_handle) != 0:
+            return 'C'
 
-        #write everything to log file
-        with open(log_file, "w") as log_handle:
-            #compile test
-            if subprocess.call([paasm_exe, filepath, file_bin], stdin=subprocess.DEVNULL, stdout=log_handle, stderr=log_handle) != 0:
-                return 'C'
+        #simulate test
+        if subprocess.call([isa_sim_exe, file_bin, sim_uart], stdin=subprocess.DEVNULL, stdout=log_handle, stderr=log_handle) != 0:
+            return 'S'
+        #compare simulation result
+        if not filecmp.cmp(exp_uart, sim_uart):
+            return 'S'
 
-            #simulate test
-            if subprocess.call([isa_sim_exe, file_bin, sim_uart], stdin=subprocess.DEVNULL, stdout=log_handle, stderr=log_handle) != 0:
-                return 'S'
-            #compare simulation result
-            if not filecmp.cmp(exp_uart, sim_uart):
-                return 'S'
+        #emulate test
+        subprocess.call(["-i", "-l", "2000000", "-O", emu_uart, "-b", file_bin], stdin=subprocess.DEVNULL, executable=emu_exe, stdout=log_handle, stderr=log_handle)
+        #compare emulation result
+        if not filecmp.cmp(exp_uart, emu_uart):
+            return 'E'
 
-            #emulate test
-            subprocess.call(["-i", "-l", "2000000", "-O", emu_uart, "-b", file_bin], stdin=subprocess.DEVNULL, executable=emu_exe, stdout=log_handle, stderr=log_handle)
-            #compare emulation result
-            if not filecmp.cmp(exp_uart, emu_uart):
-                return 'E'
+    os.remove(log_file)
+    return '-'
 
-        os.remove(log_file)
-        return '-'
-
-async def run_tests_in_parallel():
+async def run_tests_in_parallel(loop):
+    executor = ProcessPoolExecutor(max_workers=multiprocessing.cpu_count())
+    
     tests_failed = 0
     tests_succeeded = 0
 
@@ -104,7 +105,8 @@ async def run_tests_in_parallel():
         test_name = os.path.relpath(dirpath, tests_asm_dir)
         print(format("Testing {} [".format(test_name.ljust(40, ' '))), end='', flush=True)
 
-        test_results = await asyncio.gather(*[run_test(dirpath, filename, test_name) for filename in filenames])
+        test_results = await asyncio.gather(*(loop.run_in_executor(executor, run_test, dirpath, filename, test_name)
+                                                for filename in filenames))
         for test_result in test_results:
             if test_result == '-':
                 tests_succeeded = tests_succeeded + 1
@@ -117,7 +119,8 @@ async def run_tests_in_parallel():
     print("Tests failed:    {}".format(tests_failed))
     print("Tests succeeded: {}".format(tests_succeeded))
 
-asyncio.run(run_tests_in_parallel())
+loop = asyncio.get_event_loop()
+loop.run_until_complete(run_tests_in_parallel(loop))
 
 
 
