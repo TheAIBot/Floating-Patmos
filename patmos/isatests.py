@@ -51,8 +51,8 @@ os.makedirs(tests_logs_dir, exist_ok=True)
 subprocess.check_call([os.path.join(isa_gen_dir, "ISATestsGen", "ISATestsGen"), tests_asm_dir, tests_expected_dir])
 
 #compile emulator
-#copyfile(os.path.join(tests_dir, "uartForTests.s"), os.path.join(curr_dir, "asm", "uartForTests.s"))
-#subprocess.check_call(["make", "emulator", "BOOTAPP=uartForTests"])
+copyfile(os.path.join(tests_dir, "uartForTests.s"), os.path.join(curr_dir, "asm", "uartForTests.s"))
+subprocess.check_call(["make", "emulator", "BOOTAPP=uartForTests"])
 
 def run_test(dirpath, filename, test_name):
     filepath = os.path.join(dirpath, filename)
