@@ -4,44 +4,16 @@
 
 namespace patmos
 {
-	isaTest::isaTest(std::string asmfilepath, std::string expfilepath, std::string filename)
-		: asmFile(std::ofstream(asmfilepath + '/' + filename + ".s")),
-		expectedFile(std::ofstream(expfilepath + '/' + filename + ".uart"))
-	{
-			// first instruction is apparently not executed
-			asmFile << R"(		nop
-			.word 50
-			br start
-			nop
-			nop
-			.word   28
-	#Send r26 to uart
-	#Wait for uart to be ready
-	uart1:	add 	r28 = r0, 0xf0080000
-			add     r25 = r0, 4
-	t2:		lwl     r27  = [r28 + 0]
-			nop
-			btest p1 = r27, r0
-		(!p1)	br	t2
-			nop
-			nop
-	# Write r26 to uart
-			swl	[r28 + 1] = r26
-			sri r26 = r26, 8
-			sub r25 = r25, 1
-			cmpineq p1 = r25, 0
-		(p1)	br	t2
-			nop
-			nop
-			retnd
-	start:  nop
-			nop
-			nop)" << '\n';
-	}
+	isaTest::isaTest(std::string asmfilepath, std::string expfilepath, std::string filename) : 
+		asm_path(asmfilepath + '/' + filename + ".s"), 
+		uart_path(expfilepath + '/' + filename + ".uart"),
+		program_byte_count(0)
+	{}
 
-	void isaTest::addInstr(std::string instr)
+	void isaTest::addInstr(std::string instr, int32_t instr_bytes)
 	{
-		asmFile << instr << '\n';
+		program_instrs.push_back(instr);
+		program_byte_count += instr_bytes;
 	}
 
 	std::string float_to_string(float value)
@@ -57,19 +29,19 @@ namespace patmos
 	{
 		if (std::isnan(value) || std::isinf(value) || std::fpclassify(value) == FP_SUBNORMAL)
 		{
-			addInstr("addl r23 = r0, " + std::to_string(reinterpret_cast<uint32_t&>(value)) + " # " + float_to_string(value));
+			addInstr("addl r23 = r0, " + std::to_string(reinterpret_cast<uint32_t&>(value)) + " # " + float_to_string(value), 8);
 			addInstr("fmvis " + reg + " = r23");
 		}
 		else
 		{
 			addInstr("fmvis " + reg + " = r0");
-			addInstr("faddsl " + reg + " = " + reg + ", " + float_to_string(value));
+			addInstr("faddsl " + reg + " = " + reg + ", " + float_to_string(value), 8);
 		}
 	}
 
 	void isaTest::setGPReg(std::string reg, int32_t value)
 	{
-		addInstr("addl " + reg + " = r0, " + std::to_string(value));
+		addInstr("addl " + reg + " = r0, " + std::to_string(value), 8);
 	}
 
 	void isaTest::setPred(std::string reg, bool value)
@@ -92,10 +64,8 @@ namespace patmos
 
 	void isaTest::expectRegisterValue(std::string reg, int32_t value)
 	{
-		expectedFile << ((uint8_t)(value >> 0));
-		expectedFile << ((uint8_t)(value >> 8));
-		expectedFile << ((uint8_t)(value >> 16));
-		expectedFile << ((uint8_t)(value >> 24));
+		expected_uart.push_back(value);
+
 		if (reg[0] == 'r')
 		{
 			addInstr("add r26 = r0, " + reg);
@@ -126,13 +96,82 @@ namespace patmos
 		expectRegisterValue(reg, reinterpret_cast<int32_t&>(value));
 	}
 
+	void isaTest::write_asm_file()
+	{
+		std::ofstream asm_file(asm_path);
+		
+		//includes the byte count for things such as jumping over the uart function, 
+		//the uart function itself and instructions to halt the program
+		const int32_t program_overhead_bytes = 28 * 4;
+
+		//specify specificly how many bytes needs to be loaded into the instr cache
+		asm_file << ".word " + std::to_string(program_byte_count + program_overhead_bytes) << '\n';
+		
+		asm_file << R"(br start
+			nop
+			nop
+			.word   28
+	#Send r26 to uart
+	#Wait for uart to be ready
+	uart1:	add 	r28 = r0, 0xf0080000
+			add     r25 = r0, 4
+	t2:		lwl     r27  = [r28 + 0]
+			nop
+			btest p1 = r27, r0
+		(!p1)	br	t2
+			nop
+			nop
+	# Write r26 to uart
+			swl	[r28 + 1] = r26
+			sri r26 = r26, 8
+			sub r25 = r25, 1
+			cmpineq p1 = r25, 0
+		(p1)	br	t2
+			nop
+			nop
+			retnd
+	start:  nop
+			nop
+			nop)" << '\n';
+
+		asm_file << string_join(program_instrs, "\n") << '\n';
+		
+		asm_file << "halt" << '\n';
+		asm_file << "nop" << '\n';
+		asm_file << "nop" << '\n';
+		asm_file << "nop" << '\n';
+		asm_file.close();
+	}
+
+	void isaTest::write_uart_file()
+	{
+		std::ofstream uart_file(uart_path);
+
+		for (size_t i = 0; i < expected_uart.size(); i++)
+		{
+			uart_file << ((uint8_t)(expected_uart[i] >> 0));
+			uart_file << ((uint8_t)(expected_uart[i] >> 8));
+			uart_file << ((uint8_t)(expected_uart[i] >> 16));
+			uart_file << ((uint8_t)(expected_uart[i] >> 24));
+
+			/*
+			#ifdef __linux__
+			uart_file << __builtin_bswap32(expected_uart[i]);
+#elif _WIN32
+			uart_file << _byteswap_ulong(expected_uart[i]);
+#else
+			static_assert(false, R"(Platform was detected as neither linux or windows.
+You need to write the platform specific way to swap byte order here.)");
+#endif
+*/
+		}
+		
+		uart_file.close();
+	}
+
 	void isaTest::close()
 	{
-		asmFile << "halt" << '\n';
-		asmFile << "nop" << '\n';
-		asmFile << "nop" << '\n';
-		asmFile << "nop" << '\n';
-		asmFile.close();
-		expectedFile.close();
+		write_asm_file();
+		write_uart_file();
 	}
 }

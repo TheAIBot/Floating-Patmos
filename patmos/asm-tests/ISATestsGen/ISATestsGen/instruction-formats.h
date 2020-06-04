@@ -238,13 +238,14 @@ namespace patmos
 		using FArgs = decltype(std::tuple_cat(typename op_src_filter<TArgs>::type() ...));
 		using FType = typename make_func_type<FRet, FArgs, std::tuple_size<FArgs>::value>::type;
 		using FRegs = decltype(std::tuple_cat(std::conditional_t<op_src_filter<TArgs>::value, std::tuple<TArgs>, std::tuple<>>()...));
-	private:
+
 		static constexpr int32_t func_arg_count = std::tuple_size<FArgs>::value;
-		static constexpr int32_t intr_bit_count = (TArgs::bit_count + ...);
+		static constexpr int32_t instr_bit_count = (TArgs::bit_count + ...);
+		static constexpr int32_t instr_byte_count = instr_bit_count / 8;
 		static constexpr bool has_long_imm = std::is_same<const_bits<1, 1>, typename std::tuple_element<0, std::tuple<TArgs...>>::type>::value;
 		static constexpr bool has_explicit_dst_reg = std::is_base_of<explicit_dst_reg, FRetReg>::value;
-
-		check_instr_size<has_long_imm, intr_bit_count> _;
+	private:
+		check_instr_size<has_long_imm, instr_bit_count> _;
 
 
 		template<std::size_t I, typename Sources>
@@ -446,7 +447,7 @@ namespace patmos
 					testData tData = setRegistersAndGetInstrData(test, rngGen);
 
 
-					test.addInstr(instrName + " " + tData.destReg.regName + " = " + string_join(tData.instr_sources, ", "));
+					test.addInstr(instrName + " " + tData.destReg.regName + " = " + string_join(tData.instr_sources, ", "), instr_byte_count);
 					set_expected_value(test, tData.destReg, std::apply(opFunc, tData.sourceValues));
 
 					test.close();
@@ -520,7 +521,7 @@ namespace patmos
 						test.setRegister("sfcsr", sfcsr_rounding);
 
 						typename uni_f::testData tData = this->setRegistersAndGetInstrData(test, rngGen);
-						test.addInstr(this->instrName + " " + tData.destReg.regName + " = " + string_join(tData.instr_sources, ", "));
+						test.addInstr(this->instrName + " " + tData.destReg.regName + " = " + string_join(tData.instr_sources, ", "), uni_f::instr_byte_count);
 
 						std::fenv_t curr_fenv;
 						if (fegetenv(&curr_fenv) != 0)

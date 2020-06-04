@@ -20,20 +20,28 @@ namespace patmos
 		uint32_t High;
 	};
 
-	template<std::size_t size>
-	std::string string_join(const std::array<std::string, size>& strs, std::string delim)
+	template<class FWIter>
+	std::string string_join(FWIter start, const FWIter end, const std::string delim)
 	{
 		std::string joined = "";
-		if constexpr (size > 0)
+		if (start != end)
 		{
-			for (size_t i = 0; i < size - 1; i++)
+			while (start + 1 != end)
 			{
-				joined += strs[i] + delim;
+				joined += *start + delim;
+				start++;
 			}
-			joined += strs[size - 1];
+
+			joined += *start;
 		}
 
 		return joined;
+	}
+
+	template<typename T>
+	std::string string_join(const T& container, const std::string delim)
+	{
+		return string_join(std::begin(container), std::end(container), delim);
 	}
 
 	template<typename... Ts>

@@ -1,4 +1,3 @@
-        nop
         .word 50
         br start
 		nop

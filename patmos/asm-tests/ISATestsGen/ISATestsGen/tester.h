@@ -9,24 +9,31 @@
 #include <array>
 #include <vector>
 #include <cfenv>
+#include "common.h"
 
 namespace patmos
 {
 	class isaTest
 	{
 	private:
-		std::ofstream asmFile;
-		std::ofstream expectedFile;
+		std::string asm_path;
+		std::string uart_path;
+		std::vector<std::string> program_instrs;
+		std::vector<int32_t> expected_uart;
+		int32_t program_byte_count;
 
 		void setFloatReg(std::string reg, float value);
 		void setGPReg(std::string reg, int32_t value);
 		void setPred(std::string reg, bool value);
 		void setSpecialReg(std::string reg, int32_t value);
 
+		void write_asm_file();
+		void write_uart_file();
+
 	public:
 		isaTest(std::string asmfilepath, std::string expfilepath, std::string filename);
 
-		void addInstr(std::string instr);
+		void addInstr(std::string instr, int32_t instr_bytes = 4);
 
 		template<typename T>
 		void setRegister(std::string reg, T value)

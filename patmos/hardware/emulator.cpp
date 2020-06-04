@@ -538,13 +538,13 @@ You need to write the platform specific way to swap byte order here.)");
     binbuf.push_back(instr);
   }
 
-  write_extmem((131076 >> 2) - 3, 500);
-  write_extmem((131076 >> 2) - 2, 500);
-  write_extmem((131076 >> 2) - 1, 500);
-  write_extmem((131076 >> 2) - 0, 500);
   for (size_t i = 0; i < binbuf.size(); i++)
   {
-    write_extmem((131076 >> 2) + i + 1, binbuf[i]);
+    //131076 is the address of the first program instruction.
+    //-1 because the first 4 bytes ofthe program is the the cpu
+    //uses in order to know how much it should load into instr cache
+    // and this number should always be just before the first instruction.
+    write_extmem((131076 >> 2) + i - 1, binbuf[i]);
   }
 
   return 131076;
