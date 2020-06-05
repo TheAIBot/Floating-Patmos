@@ -29,8 +29,10 @@ namespace patmos
 		//virtual void makeTests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const = 0;
 
 		virtual void make_single_op_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const = 0;
+		
+		virtual void make_forwarding_tests(std::string asm_path, std::string exp_path, std::mt19937& rng_gen, int32_t test_count) const = 0;
+
 		//virtual void make_loop_op_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const = 0;
-		//virtual void make_forwarding_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const = 0;
 		//virtual void make_pipelined_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const = 0;
 
 		//virtual std::vector<int32_t> encode(std::string instr) const = 0;
@@ -387,6 +389,33 @@ namespace patmos
 			(handle_dup_reg_source<Is>(sourceValues, instr_sources, make_partial_index_sequence<Is, Is...>()), ...);
 		}
 
+		template<typename Dst, typename Src>
+		struct is_dst_and_src_reg_type_same { static constexpr bool value = false; };
+
+		template<reg_type t>
+		struct is_dst_and_src_reg_type_same<reg_dst<t>, reg_src<t>> { static constexpr bool value = true; };
+
+		template<std::size_t... Is>
+		static constexpr bool has_same_src_and_dst_reg_type(std::index_sequence<Is...> _)
+		{
+			return has_explicit_dst_reg && (is_dst_and_src_reg_type_same<FRetReg, typename std::tuple_element<Is, FRegs>::type>::value || ...);
+		}
+
+		template<typename T, std::size_t I>
+		void replace_source_with_new_value(std::array<std::string, func_arg_count>& sources, std::string source, FArgs& values, T value) const
+		{
+			if (sources[I] == source)
+			{
+				std::get<I>(values) = value;
+			}
+		}
+
+		template<typename T, std::size_t... Is>
+		void replace_sources_with_new_value(std::array<std::string, func_arg_count>& sources, std::string source, FArgs& values, T value, std::index_sequence<Is...> _) const
+		{
+			(replace_source_with_new_value<T, Is>(sources, source, values, value), ...);
+		}
+
 	protected:
 		FType opFunc;
 		std::array<opSource, func_arg_count> sources;
@@ -429,6 +458,46 @@ namespace patmos
 			}
 		}
 
+		template<std::size_t I>
+		void make_internal_forwarding_test(std::string asm_path, std::string exp_path, std::mt19937& rng_gen, int32_t test_count) const
+		{
+			if constexpr (is_dst_and_src_reg_type_same<FRetReg, typename std::tuple_element<I, FRegs>::type>::value)
+			{
+				std::string asm_dir = create_dir_if_not_exists(asm_path, "dst-op" + std::to_string(I));
+				std::string uart_dir = create_dir_if_not_exists(exp_path, "dst-op" + std::to_string(I));
+
+				const int32_t pipeline_stages = 5;
+				for (size_t i = 0; i < test_count; i++)
+				{
+					isaTest test(asm_dir, uart_dir, instrName + "-" + std::to_string(i));
+					testData tData = setRegistersAndGetInstrData(test, rng_gen);
+
+					FRet result = 0;
+					for (size_t z = 0; z < pipeline_stages; z++)
+					{
+						tData.destReg = getRandomReg(rng_gen, getDestRegs());
+						test.addInstr(instrName + " " + tData.destReg.regName + " = " + string_join(tData.instr_sources, ", "), instr_byte_count);
+						std::get<I>(tData.instr_sources) = tData.destReg.regName;
+
+						result = tData.destReg.isReadonly ? static_cast<FRet>(tData.destReg.readonly_value) : std::apply(opFunc, tData.sourceValues);
+						replace_sources_with_new_value(tData.instr_sources, tData.destReg.regName, tData.sourceValues, result, std::make_index_sequence<func_arg_count>());
+					}
+					
+					set_expected_value(test, tData.destReg, result);
+
+					test.close();
+				}
+			}
+		}
+
+		template<std::size_t... Is>
+		void make_internal_forwarding_tests(std::string asm_path, std::string exp_path, std::mt19937& rng_gen, int32_t test_count, std::index_sequence<Is...> _) const
+		{
+			(make_internal_forwarding_test<Is>(asm_path, exp_path, rng_gen, test_count), ...);
+		}
+
+		
+
 	public:
 		uni_format(std::string name, Pipes pipe, FType opFunc, TArgs...instr_bits) : baseFormat(name, pipe), opFunc(opFunc), sources(createSources(instr_bits...)), instr_bit_parts(std::make_tuple(instr_bits...))
 		{}
@@ -443,9 +512,7 @@ namespace patmos
 				for (size_t i = 0; i < testCount; i++)
 				{
 					isaTest test(asm_dir, uart_dir, instrName + "-" + std::to_string(i));
-
 					testData tData = setRegistersAndGetInstrData(test, rngGen);
-
 
 					test.addInstr(instrName + " " + tData.destReg.regName + " = " + string_join(tData.instr_sources, ", "), instr_byte_count);
 					set_expected_value(test, tData.destReg, std::apply(opFunc, tData.sourceValues));
@@ -457,6 +524,17 @@ namespace patmos
 			{
 				throw std::runtime_error("Expected method to be overwritten but it was still called.");
 			}
+		}
+
+		void make_forwarding_tests(std::string asm_path, std::string exp_path, std::mt19937& rng_gen, int32_t test_count) const override
+		{
+			if constexpr (has_same_src_and_dst_reg_type(std::make_index_sequence<func_arg_count>()))
+			{
+				std::string asm_dir = create_dir_if_not_exists(asm_path, instrName);
+				std::string uart_dir = create_dir_if_not_exists(exp_path, instrName);
+
+				make_internal_forwarding_tests(asm_dir, uart_dir, rng_gen, test_count, std::make_index_sequence<func_arg_count>());
+			}	
 		}
 
 		template<typename T, std::size_t I, int32_t bit_shift> struct get_bit_shift : get_bit_shift<T, I - 1, bit_shift + std::tuple_element<I, T>::type::bit_count> {};
@@ -676,21 +754,6 @@ namespace patmos
 	public:
 		FPCf_format(std::string name, int32_t func, std::function<int32_t(float)> funcOp, const std::vector<std::function<void(isaTest&)>>& special_tests = no_special_tests, const std::vector<rounding::x86_round_mode>& rounding_modes = x86_and_patmos_compat_rounding_modes);
 
-		void make_single_op_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const override
-		{
-			uni_float_format::make_single_op_tests(asmfilepath, expfilepath, rngGen, testCount);
-
-			if (special_tests.size() > 0)
-			{
-				std::string asm_dir = create_dir_if_not_exists(asmfilepath, this->instrName + "-special");
-				std::string uart_dir = create_dir_if_not_exists(expfilepath, this->instrName + "-special");
-
-				for (size_t i = 0; i < special_tests.size(); i++)
-				{
-					isaTest test(asm_dir, uart_dir, instrName + "-" + std::to_string(i + testCount));
-					special_tests[i](test);
-				}
-			}
-		}
+		void make_single_op_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const override;
 	};
 }

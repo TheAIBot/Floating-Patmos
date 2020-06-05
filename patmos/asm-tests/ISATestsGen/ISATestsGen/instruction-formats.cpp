@@ -242,5 +242,21 @@ namespace patmos
 		const_bits<3, 0b001>(),
 		instr_dep_bits<4>(func)), special_tests(special_tests)
 	{}
+	void FPCf_format::make_single_op_tests(std::string asmfilepath, std::string expfilepath, std::mt19937& rngGen, int32_t testCount) const
+	{
+		uni_float_format::make_single_op_tests(asmfilepath, expfilepath, rngGen, testCount);
+
+		if (special_tests.size() > 0)
+		{
+			std::string asm_dir = create_dir_if_not_exists(asmfilepath, this->instrName + "-special");
+			std::string uart_dir = create_dir_if_not_exists(expfilepath, this->instrName + "-special");
+
+			for (size_t i = 0; i < special_tests.size(); i++)
+			{
+				isaTest test(asm_dir, uart_dir, instrName + "-" + std::to_string(i + testCount));
+				special_tests[i](test);
+			}
+		}
+	}
 
 }

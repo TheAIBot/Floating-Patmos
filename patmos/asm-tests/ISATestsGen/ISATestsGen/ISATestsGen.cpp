@@ -269,18 +269,23 @@ int main(int argc, char const *argv[])
 
 	std::cout << "Generating tests..." << std::endl;
 	
-
 	std::fesetround(FE_TONEAREST);
+
+	std::mt19937 rngGen(37);
 
 	std::string single_op_asm_dir = patmos::create_dir_if_not_exists(TESTS_DIR_ASM, "single_op_tests");
 	std::string single_op_uart_dir = patmos::create_dir_if_not_exists(TESTS_DIR_EXPECTED, "single_op_tests");
-	
-
-	std::mt19937 rngGen(37);
 	for (patmos::baseFormat* instr : patmos::instrs)
 	{
 		instr->make_single_op_tests(single_op_asm_dir, single_op_uart_dir, rngGen, 50);
 	}	
+
+	std::string forwarding_asm_dir = patmos::create_dir_if_not_exists(TESTS_DIR_ASM, "forwarding_tests");
+	std::string forwarding_uart_dir = patmos::create_dir_if_not_exists(TESTS_DIR_EXPECTED, "forwarding_tests");
+	for (patmos::baseFormat* instr : patmos::instrs)
+	{
+		instr->make_forwarding_tests(forwarding_asm_dir, forwarding_uart_dir, rngGen, 50);
+	}
 
 	std::cout << "Tests generated." << std::endl;
 
