@@ -7,6 +7,7 @@ namespace patmos
 	isaTest::isaTest(std::string asmfilepath, std::string expfilepath, std::string filename) : 
 		asm_path(asmfilepath + '/' + filename + ".s"), 
 		uart_path(expfilepath + '/' + filename + ".uart"),
+		debug_path(expfilepath + '/' + filename + ".debug"),
 		program_byte_count(0)
 	{}
 
@@ -29,7 +30,7 @@ namespace patmos
 	{
 		if (std::isnan(value) || std::isinf(value) || std::fpclassify(value) == FP_SUBNORMAL)
 		{
-			addInstr("addl r23 = r0, " + std::to_string(reinterpret_cast<uint32_t&>(value)) + " # " + float_to_string(value), 8);
+			addInstr("addl r23 = r0, " + std::to_string((uint32_t)fti(value)) + " # " + float_to_string(value), 8);
 			addInstr("fmvis " + reg + " = r23");
 		}
 		else
@@ -62,10 +63,8 @@ namespace patmos
 		addInstr("mts " + reg + " = r26");
 	}
 
-	void isaTest::expectRegisterValue(std::string reg, int32_t value)
+	void isaTest::move_to_uart_register(std::string reg)
 	{
-		expected_uart.push_back(value);
-
 		if (reg[0] == 'r')
 		{
 			addInstr("add r26 = r0, " + reg);
@@ -87,13 +86,38 @@ namespace patmos
 			throw std::runtime_error("Wanted to create a tests that expects the register "
 				+ reg + " but registers of that type are currently not supported.");
 		}
+	}
 
+	void isaTest::expectRegisterValue(std::string reg, int32_t value)
+	{
+		expected_uart.push_back(value);
+		if (reg == "sfcsr" || reg == "s1")
+		{
+			debug_info.push_back(test_debug_info(reg, "exception"));
+		}
+		else
+		{
+			debug_info.push_back(test_debug_info(reg, "int"));
+		}
 
+		move_to_uart_register(reg);
+		addInstr("callnd uart1");
+	}
+	void isaTest::expectRegisterValue(std::string reg, bool value)
+	{
+		expected_uart.push_back(value);
+		debug_info.push_back(test_debug_info(reg, "bool"));
+		
+		move_to_uart_register(reg);
 		addInstr("callnd uart1");
 	}
 	void isaTest::expectRegisterValue(std::string reg, float value)
 	{
-		expectRegisterValue(reg, reinterpret_cast<int32_t&>(value));
+		expected_uart.push_back(fti(value));
+		debug_info.push_back(test_debug_info(reg, "float"));
+		
+		move_to_uart_register(reg);
+		addInstr("callnd uart1");
 	}
 
 	void isaTest::write_asm_file()
@@ -149,29 +173,28 @@ namespace patmos
 
 		for (size_t i = 0; i < expected_uart.size(); i++)
 		{
-			uart_file << ((uint8_t)(expected_uart[i] >> 0));
-			uart_file << ((uint8_t)(expected_uart[i] >> 8));
-			uart_file << ((uint8_t)(expected_uart[i] >> 16));
-			uart_file << ((uint8_t)(expected_uart[i] >> 24));
-
-			/*
-			#ifdef __linux__
-			uart_file << __builtin_bswap32(expected_uart[i]);
-#elif _WIN32
-			uart_file << _byteswap_ulong(expected_uart[i]);
-#else
-			static_assert(false, R"(Platform was detected as neither linux or windows.
-You need to write the platform specific way to swap byte order here.)");
-#endif
-*/
+			uart_file.write(reinterpret_cast<char*>(&expected_uart[i]), sizeof(int32_t));
 		}
 		
 		uart_file.close();
+	}
+
+	void isaTest::write_debug_file()
+	{
+		std::ofstream debug_file(debug_path);
+
+		for (size_t i = 0; i < debug_info.size(); i++)
+		{
+			debug_file << debug_info[i].dst_reg + " : " + debug_info[i].value_type << '\n';
+		}
+		
+		debug_file.close();
 	}
 
 	void isaTest::close()
 	{
 		write_asm_file();
 		write_uart_file();
+		write_debug_file();
 	}
 }
