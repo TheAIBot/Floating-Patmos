@@ -74,7 +74,7 @@ namespace patmos
 
 	int32_t classifyFloat(float a)
 	{
-		int32_t ai = reinterpret_cast<int32_t&>(a);
+		int32_t ai = fti(a);
 		bool isQuietNan = (ai & (1 << 22)) != 0;
 
 		return (std::isnan(a) && !isQuietNan) << 9 |
@@ -241,12 +241,12 @@ namespace patmos
 		// FPCt
 		new FPCt_format("fcvtis", 0b0000, [](int32_t a) { return static_cast<float>(a); }),
 		new FPCt_format("fcvtus", 0b0001, [](int32_t a) { return static_cast<float>(static_cast<uint32_t>(a)); }),
-		new FPCt_format("fmvis" , 0b0010, [](int32_t a) { return reinterpret_cast<float&>(a); }),
+		new FPCt_format("fmvis" , 0b0010, [](int32_t a) { return itf(a); }),
 
 		// FPCf
 		new FPCf_format("fcvtsi" , 0b0000, [](float a) { return static_cast<int32_t>(a); }, no_special_tests, float_to_int_rounding),
 		new FPCf_format("fcvtsu" , 0b0001, [](float a) { return static_cast<uint32_t>(a); }, no_special_tests, float_to_int_rounding),
-		new FPCf_format("fmvsi"  , 0b0010, [](float a) { return reinterpret_cast<int32_t&>(a); }),
+		new FPCf_format("fmvsi"  , 0b0010, [](float a) { return fti(a); }),
 		new FPCf_format("fclasss", 0b0011, classifyFloat, fclass_special_test),
 	};
 }

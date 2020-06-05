@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <filesystem>
+#include <cstring>
 
 namespace patmos
 {
@@ -57,4 +58,7 @@ namespace patmos
 
 		return dir_path;
 	}
+
+	int32_t fti(float f);
+	float itf(int32_t i);
 }
