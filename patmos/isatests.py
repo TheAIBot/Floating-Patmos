@@ -99,16 +99,33 @@ def load_debug_symbols(debug_file):
 def write_uart_diff(log_handle, expected_uart_file, actual_uart_file, debug_file):
     symbols = load_debug_symbols(debug_file)
 
+    log_handle.write("\n\n")
+    log_handle.write("#####################\n")
+    log_handle.write("## Uart difference ##\n")
+    log_handle.write("#####################\n")
+    log_handle.write("\n")
+    log_handle.write("Expected:\n")
     log_handle.write("Expected:\n")
     prety_write_uart(log_handle, expected_uart_file, symbols)
     log_handle.write("Actual:\n")
     prety_write_uart(log_handle, actual_uart_file, symbols)
+
+def write_asm(log_handle, asm_file):
+    log_handle.write("\n\n")
+    log_handle.write("##############\n")
+    log_handle.write("## Assembly ##\n")
+    log_handle.write("##############\n")
+    log_handle.write("\n")
+
+    with open(asm_file, "r") as asm_handle:
+        log_handle.writelines(asm_handle.readlines())
 
 def run_test(dirpath, filename, test_name):
     filepath = os.path.join(dirpath, filename)
     basename = os.path.splitext(filename)[0]
     log_file = os.path.join(tests_logs_dir, test_name, basename + ".s")
     debug_file = os.path.join(tests_expected_dir, test_name, basename + ".debug")
+    asm_file = os.path.join(tests_asm_dir, test_name, basename + ".s")
     file_bin = os.path.join(tests_bin_dir, test_name, basename + ".bin")
     sim_uart = os.path.join(tests_sim_actual_dir, test_name, basename + ".uart")
     exp_uart = os.path.join(tests_expected_dir, test_name, basename + ".uart")
@@ -132,6 +149,7 @@ def run_test(dirpath, filename, test_name):
         #compare simulation result
         if not filecmp.cmp(exp_uart, sim_uart):
             write_uart_diff(log_handle, exp_uart, sim_uart, debug_file)
+            write_asm(log_handle, asm_file)
             return 'S'
 
         #emulate test
@@ -139,6 +157,7 @@ def run_test(dirpath, filename, test_name):
         #compare emulation result
         if not filecmp.cmp(exp_uart, emu_uart):
             write_uart_diff(log_handle, exp_uart, emu_uart, debug_file)
+            write_asm(log_handle, asm_file)
             return 'E'
 
     os.remove(log_file)
