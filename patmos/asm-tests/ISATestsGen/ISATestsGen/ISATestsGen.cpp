@@ -72,6 +72,24 @@ namespace patmos
 		return mRes;
 	}
 
+	uint32_t fcvtsu_func(float a)
+	{
+		if (a < 0.0f)
+		{
+			std::fexcept_t exceptions = FE_UNDERFLOW;
+			if (fesetexceptflag(&exceptions, FE_UNDERFLOW) != 0)
+			{
+				std::runtime_error("Failed to set floating-point exceptions.");
+			}
+
+			return 0;
+		}
+		else
+		{
+			return static_cast<uint32_t>(a);
+		}
+	}
+
 	int32_t classifyFloat(float a)
 	{
 		int32_t ai = fti(a);
@@ -245,7 +263,7 @@ namespace patmos
 
 		// FPCf
 		new FPCf_format("fcvtsi" , 0b0000, [](float a) { return static_cast<int32_t>(a); }, no_special_tests, float_to_int_rounding),
-		new FPCf_format("fcvtsu" , 0b0001, [](float a) { return static_cast<uint32_t>(a); }, no_special_tests, float_to_int_rounding),
+		new FPCf_format("fcvtsu" , 0b0001, fcvtsu_func, no_special_tests, float_to_int_rounding),
 		new FPCf_format("fmvsi"  , 0b0010, [](float a) { return fti(a); }),
 		new FPCf_format("fclasss", 0b0011, classifyFloat, fclass_special_test),
 	};

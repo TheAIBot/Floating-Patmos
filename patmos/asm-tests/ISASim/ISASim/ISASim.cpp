@@ -129,6 +129,24 @@ std::fexcept_t patmos_to_x86_exceptions(const int32_t ex)
 		(((ex & (int32_t)patmos_exceptions::NX) >> get_leading_zeroes(patmos_exceptions::NX)) << get_leading_zeroes(FE_INEXACT)));
 }
 
+uint32_t fcvtsu_func(float a)
+{
+	if (a < 0.0f)
+	{
+		std::fexcept_t exceptions = FE_UNDERFLOW;
+		if (fesetexceptflag(&exceptions, FE_UNDERFLOW) != 0)
+		{
+			std::runtime_error("Failed to set floating-point exceptions.");
+		}
+
+		return 0;
+	}
+	else
+	{
+		return static_cast<uint32_t>(a);
+	}
+}
+
 
 
 
@@ -1060,7 +1078,7 @@ private:
 				setGPR(rd, (int32_t)getFPR(rs1));
 				break;
 			case 0b0001:
-				setGPR(rd, (uint32_t)getFPR(rs1));
+				setGPR(rd, fcvtsu_func(getFPR(rs1)));
 				break;
 			case 0b0010:
             {
