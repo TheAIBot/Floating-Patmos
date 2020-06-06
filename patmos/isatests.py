@@ -66,30 +66,33 @@ def prety_write_uart(log_handle, uart_file, debug_symbols):
     with open(uart_file, "rb") as uart_handle:
         for symbol in debug_symbols:
             bytes4 = uart_handle.read(4)
-            for b in bytes4:
+            #bytes4 = bytes4[::-1]
+
+            for b in reversed(bytes4):
                 log_handle.write("{0:08b} ".format(b))
             log_handle.write(": ")
 
-            bytes4 = bytes4[::-1]
             if symbol.type == "int":
                 log_handle.write(str(struct.unpack("i", bytes4)[0]) + "\n")
-            elif symbol.type == "bool":
-                log_handle.write(str(struct.unpack("i", bytes4)[0]) + "\n")
             elif symbol.type == "float":
-                num = log_handle.write(str(struct.unpack("f", bytes4)[0]) + "\n")
+                log_handle.write(str(struct.unpack("f", bytes4)[0]) + "\n")
+            elif symbol.type == "bool":
+                num = struct.unpack("i", bytes4)[0]
                 if num == 1:
                     log_handle.write("True\n")
                 else:
                     log_handle.write("False\n")
+            elif symbol.type == "exception":
+                log_handle.write(str(struct.unpack("i", bytes4)[0]) + "\n")
             else:
                 raise Exception("unexpected debug symbol type. Type: " + symbol.type)
 
 def load_debug_symbols(debug_file):
     symbols = []
     with open(debug_file, "r") as debug_handle:
-        line = debug_handle.readline()
-        split_line = line.split(":")
-        symbols.append(debug_symbols(split_line[0].strip(), split_line[1].strip()))
+        for line in debug_handle.readlines():
+            split_line = line.split(":")
+            symbols.append(debug_symbols(split_line[0].strip(), split_line[1].strip()))
     return symbols
 
 
