@@ -629,6 +629,12 @@ namespace patmos
 							throw std::runtime_error("Failed to restore the floating-point environment.");
 						}
 
+						//nan on x86 is not the same nan as per the RISCV spec
+						if (std::isnan(result))
+						{
+							result = itf(0x7fc00000);
+						}
+
 						this->set_expected_value(test, tData.destReg, result);
 						test.expectRegisterValue("sfcsr", patmos_exceptions | sfcsr_rounding);
 

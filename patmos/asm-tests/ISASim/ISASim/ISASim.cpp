@@ -13,6 +13,7 @@
 #include <cmath>
 #include <memory>
 #include <cfenv>
+#include <cstring>
 #include "ISASim.h"
 
 #pragma STDC FENV_ACCESS ON
@@ -33,6 +34,14 @@ int32_t classifyFloat(float a)
 		   (!std::signbit(a) && std::fpclassify(a) == FP_SUBNORMAL) << 2 |
 		   (!std::signbit(a) && std::isnormal(a)) << 1 |
 		   (!std::signbit(a) && std::isinf(a)) << 0;
+}
+
+float itf(int32_t i)
+{
+	static_assert(sizeof(int32_t) == sizeof(float));
+	float f;
+	std::memcpy(&f, &i, sizeof(i));
+	return f;
 }
 
 enum class patmos_round_mode
@@ -1004,7 +1013,14 @@ private:
 			switch (fpuFunc)
 			{
 			case 0b0000:
-				setFPR(rd, std::sqrt(fpuOp1));
+			{
+				float value = std::sqrt(fpuOp1);
+				if (std::isnan(value))
+				{
+					value = itf(0x7fc00000);
+				}
+				setFPR(rd, value);
+			}
 				break;
 			default:
 				restore_fp_env();
