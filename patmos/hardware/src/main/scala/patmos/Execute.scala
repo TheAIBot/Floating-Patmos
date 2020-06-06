@@ -397,6 +397,7 @@ class Execute() extends Module {
 
   when(exReg.fpuOp.isFpuPd && io.ena) {
     predReg(exReg.predOp(0).dest) := fpuc.io.pd
+    predReg(0) := Bool(true)
     fcsr := Cat(fcsr(DATA_WIDTH - 1, F32_EXCEPTION_WIDTH), fcsr(F32_EXCEPTION_WIDTH - 1, 0) | fpuc.io.exceptionFlags)
   }
 
