@@ -450,7 +450,7 @@ namespace patmos
 		{
 			if (reg.isReadonly)
 			{
-				test.expectRegisterValue(reg.regName, reg.readonly_value);
+				test.expectRegisterValue(reg.regName, (FRet)reg.readonly_value);
 			}
 			else
 			{
