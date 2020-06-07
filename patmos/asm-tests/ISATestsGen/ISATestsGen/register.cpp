@@ -107,7 +107,7 @@ namespace patmos
 		regInfo("sl", 2),
 		regInfo("s3", 3),
 		regInfo("sh", 3),
-		regInfo("s4", 4),
+		//regInfo("s4", 4),
 		regInfo("s5", 5),
 		regInfo("ss", 5),
 		regInfo("s6", 6),
@@ -120,10 +120,10 @@ namespace patmos
 		regInfo("sxb", 9),
 		regInfo("s10", 10),
 		regInfo("sxo", 10),
-		regInfo("s11", 11),
-		regInfo("s12", 12),
-		regInfo("s13", 13),
-		regInfo("s14", 14),
-		regInfo("s15", 15)
+		//regInfo("s11", 11),
+		//regInfo("s12", 12),
+		//regInfo("s13", 13),
+		//regInfo("s14", 14),
+		//regInfo("s15", 15)
 	};
 }
