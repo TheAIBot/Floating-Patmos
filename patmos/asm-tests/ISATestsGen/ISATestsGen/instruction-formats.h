@@ -275,10 +275,11 @@ namespace patmos
 				if constexpr (std::is_same<reg_src<reg_type::SPR>, typename std::tuple_element<I, FRegs>::type>::value)
 				{
 					//special register s0 isn't readonly, but the first bit of the 
-					//register is so add the value of that to the value of the register
+					//register is, so add the value of that to the value of the register.
+					//s0 also only stores the first 8 bits.
 					if (rndReg.regName == "s0")
 					{
-						value = value | 1;
+						value = (value & 0xff) | 1;
 					}
 				}				
 				
@@ -448,6 +449,17 @@ namespace patmos
 
 		void set_expected_value(isaTest& test, regInfo& reg, FRet value) const
 		{
+			if constexpr (std::is_same<FRetReg, reg_dst<reg_type::SPR>>::value)
+			{
+				//Only possible to write to the first 8 bits of s0
+				//and the first bit is always set
+				if (reg.regName == "s0")
+				{
+					test.expectRegisterValue(reg.regName, (value & 0xff) | 1);
+					return;
+				}
+			}
+
 			if (reg.isReadonly)
 			{
 				test.expectRegisterValue(reg.regName, (FRet)reg.readonly_value);
