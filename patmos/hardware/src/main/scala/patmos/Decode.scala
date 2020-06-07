@@ -384,7 +384,7 @@ class Decode() extends Module {
   when(opcode === OPCODE_FPU && (opc === OPC_FPUR || opc === OPC_FPUL)) {
     switch(func) {
       is(FP_FUNC_ADD, FP_FUNC_SUB, FP_FUNC_MUL) {
-        io.fpuStallTime := UInt(6)
+        io.fpuStallTime := UInt(7)
         io.decex.fpuOp.fpuRdSrc := FPU_RD_FROM_MULADD
       }
       is(FP_FUNC_DIV) {

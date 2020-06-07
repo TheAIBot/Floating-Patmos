@@ -3,6 +3,9 @@
 
 #pragma once
 
-#include <iostream>
+#include "register.h"
+#include "tester.h"
+#include "instruction-formats.h"
+#include "common.h"
 
 // TODO: Reference additional headers your program requires here.
