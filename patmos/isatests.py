@@ -131,12 +131,6 @@ def run_test(dirpath, filename, test_name):
     exp_uart = os.path.join(tests_expected_dir, test_name, basename + ".uart")
     emu_uart = os.path.join(tests_emu_actual_dir, test_name, basename + ".uart")
 
-    os.makedirs(os.path.join(tests_bin_dir, test_name), exist_ok=True)
-    os.makedirs(os.path.join(tests_emu_actual_dir, test_name), exist_ok=True)
-    os.makedirs(os.path.join(tests_sim_actual_dir, test_name), exist_ok=True)
-    os.makedirs(os.path.join(tests_hw_actual_dir, test_name), exist_ok=True)
-    os.makedirs(os.path.join(tests_logs_dir, test_name), exist_ok=True)
-
     #write everything to log file
     with open(log_file, "w") as log_handle:
         #compile test
@@ -175,7 +169,15 @@ async def run_tests_in_parallel(loop):
             continue
 
         test_name = os.path.relpath(dirpath, tests_asm_dir)
-        print(format("Testing {} [".format(test_name.ljust(40, ' '))), end='', flush=True)
+
+        os.makedirs(os.path.join(tests_bin_dir, test_name), exist_ok=True)
+        os.makedirs(os.path.join(tests_emu_actual_dir, test_name), exist_ok=True)
+        os.makedirs(os.path.join(tests_sim_actual_dir, test_name), exist_ok=True)
+        os.makedirs(os.path.join(tests_hw_actual_dir, test_name), exist_ok=True)
+        os.makedirs(os.path.join(tests_logs_dir, test_name), exist_ok=True)
+
+
+        print(format("Testing {} [".format(test_name.ljust(50, ' '))), end='', flush=True)
 
         test_results = await asyncio.gather(*(loop.run_in_executor(executor, run_test, dirpath, filename, test_name)
                                                 for filename in filenames))
