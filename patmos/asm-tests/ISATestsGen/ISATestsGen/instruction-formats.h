@@ -299,18 +299,6 @@ namespace patmos
 			};
 		}
 
-		constexpr const std::vector<regInfo>& getDestRegs() const
-		{
-			if constexpr (has_explicit_dst_reg)
-			{
-				return get_register_from_type(FRetReg::regType);
-			}
-			else
-			{
-				return std::vector<regInfo>();
-			}
-		}
-
 		template<reg_type t>
 		opSource get_source(reg_src<t> src) const
 		{
@@ -411,12 +399,6 @@ namespace patmos
 			}
 		}
 
-		template<typename T, std::size_t... Is>
-		void replace_sources_with_new_value(std::array<std::string, func_arg_count>& sources, std::string source, FArgs& values, T value, std::index_sequence<Is...> _) const
-		{
-			(replace_source_with_new_value<T, Is>(sources, source, values, value), ...);
-		}
-
 	protected:
 		FType opFunc;
 		std::array<opSource, func_arg_count> sources;
@@ -431,6 +413,18 @@ namespace patmos
 			testData() : destReg(regInfo("", 0)), sourceValues(FArgs()), instr_sources(std::array<std::string, func_arg_count>())
 			{ }
 		};
+
+		constexpr const std::vector<regInfo>& getDestRegs() const
+		{
+			if constexpr (has_explicit_dst_reg)
+			{
+				return get_register_from_type(FRetReg::regType);
+			}
+			else
+			{
+				return std::vector<regInfo>();
+			}
+		}
 
 		testData setRegistersAndGetInstrData(isaTest& test, std::mt19937& rngGen) const
 		{
@@ -470,13 +464,18 @@ namespace patmos
 			}
 		}
 
-		template<std::size_t I>
-		void make_internal_forwarding_test(std::string asm_path, std::string exp_path, std::mt19937& rng_gen, int32_t test_count) const
+		template<typename T, std::size_t... Is>
+		void replace_sources_with_new_value(std::array<std::string, func_arg_count>& sources, std::string source, FArgs& values, T value, std::index_sequence<Is...> _) const
 		{
-			if constexpr (is_dst_and_src_reg_type_same<FRetReg, typename std::tuple_element<I, FRegs>::type>::value)
+			(replace_source_with_new_value<T, Is>(sources, source, values, value), ...);
+		}
+
+		virtual void make_internal_forwarding_test(std::string asm_path, std::string exp_path, std::mt19937& rng_gen, int32_t test_count, std::size_t op_index) const
+		{
+			if constexpr (useMakeTests)
 			{
-				std::string asm_dir = create_dir_if_not_exists(asm_path, "dst-op" + std::to_string(I));
-				std::string uart_dir = create_dir_if_not_exists(exp_path, "dst-op" + std::to_string(I));
+				std::string asm_dir = create_dir_if_not_exists(asm_path, "dst-op" + std::to_string(op_index));
+				std::string uart_dir = create_dir_if_not_exists(exp_path, "dst-op" + std::to_string(op_index));
 
 				const int32_t pipeline_stages = 5;
 				for (size_t i = 0; i < test_count; i++)
@@ -489,7 +488,7 @@ namespace patmos
 					{
 						tData.destReg = getRandomReg(rng_gen, getDestRegs());
 						test.addInstr(instrName + " " + tData.destReg.regName + " = " + string_join(tData.instr_sources, ", "), instr_byte_count);
-						std::get<I>(tData.instr_sources) = tData.destReg.regName;
+						tData.instr_sources[op_index] = tData.destReg.regName;
 
 						result = tData.destReg.isReadonly ? static_cast<FRet>(tData.destReg.readonly_value) : std::apply(opFunc, tData.sourceValues);
 						replace_sources_with_new_value(tData.instr_sources, tData.destReg.regName, tData.sourceValues, result, std::make_index_sequence<func_arg_count>());
@@ -502,10 +501,19 @@ namespace patmos
 			}
 		}
 
+		template<std::size_t I>
+		void try_make_internal_forwarding_test(std::string asm_path, std::string exp_path, std::mt19937& rng_gen, int32_t test_count) const
+		{
+			if constexpr (is_dst_and_src_reg_type_same<FRetReg, typename std::tuple_element<I, FRegs>::type>::value)
+			{
+				make_internal_forwarding_test(asm_path, exp_path, rng_gen, test_count, I);
+			}
+		}
+
 		template<std::size_t... Is>
 		void make_internal_forwarding_tests(std::string asm_path, std::string exp_path, std::mt19937& rng_gen, int32_t test_count, std::index_sequence<Is...> _) const
 		{
-			(make_internal_forwarding_test<Is>(asm_path, exp_path, rng_gen, test_count), ...);
+			(try_make_internal_forwarding_test<Is>(asm_path, exp_path, rng_gen, test_count), ...);
 		}
 
 		
@@ -580,8 +588,106 @@ namespace patmos
 	private:
 		const std::vector<rounding::x86_round_mode>& rounding_modes;
 		using FRet = typename uni_format<false, TArgs...>::FRet;
+		using FRetReg = typename uni_format<false, TArgs...>::FRetReg;
+		using FArgs = typename uni_format<false, TArgs...>::FArgs;
 		using FType = typename uni_format<false, TArgs...>::FType;
 		using uni_f = uni_format<false, TArgs...>;
+
+		struct fp_result
+		{
+			FRet result;
+			int32_t exceptions;
+		};
+
+		fp_result get_fp_result(rounding::x86_round_mode x86_round, FArgs& source_values) const
+		{
+			fp_result fp_res;
+
+			std::fenv_t curr_fenv;
+			if (fegetenv(&curr_fenv) != 0)
+			{
+				throw std::runtime_error("Failed to store the current floating-point environment.");
+			}
+			if (fesetround((int32_t)x86_round) != 0)
+			{
+				throw std::runtime_error("Failed to set the floating-point rounding mode.");
+			}
+			if (feclearexcept(FE_ALL_EXCEPT) != 0)
+			{
+				throw std::runtime_error("Failed to clear floating-point exceptions.");
+			}
+
+			fp_res.result = std::apply(this->opFunc, source_values);
+
+			std::fexcept_t x86_exceptions;
+			if (fegetexceptflag(&x86_exceptions, FE_ALL_EXCEPT) != 0)
+			{
+				throw std::runtime_error("Failed to get floating-point exceptions.");
+			}
+			int32_t patmos_exceptions = exception::x86_to_patmos_exceptions(x86_exceptions);
+
+			if (fesetenv(&curr_fenv) != 0)
+			{
+				throw std::runtime_error("Failed to restore the floating-point environment.");
+			}
+
+			if constexpr (std::is_same<FRetReg, reg_dst<reg_type::FPR>>::value)
+			{
+				//nan on x86 is not the same nan as per the RISCV spec
+				if (std::isnan(fp_res.result))
+				{
+					fp_res.result = itf(0x7fc00000);
+				}
+			}
+
+			fp_res.exceptions = patmos_exceptions;
+			return fp_res;
+		}
+
+		void make_internal_forwarding_test(std::string asm_path, std::string exp_path, std::mt19937& rng_gen, int32_t test_count, std::size_t op_index) const override
+		{
+			std::string asm_dir = create_dir_if_not_exists(asm_path, "dst-op" + std::to_string(op_index));
+			std::string uart_dir = create_dir_if_not_exists(exp_path, "dst-op" + std::to_string(op_index));
+
+			for (auto x86_round : rounding_modes)
+			{
+				rounding::patmos_round_mode patmos_round = rounding::x86_to_patmos_round(x86_round);
+				std::string patmos_round_str = rounding::patmos_round_to_string(patmos_round);
+
+				std::string asm_rounding_dir = create_dir_if_not_exists(asm_dir, "rounding_" + patmos_round_str);
+				std::string uart_rounding_dir = create_dir_if_not_exists(uart_dir, "rounding_" + patmos_round_str);
+
+				const int32_t pipeline_stages = 5;
+				for (size_t i = 0; i < test_count; i++)
+				{
+					isaTest test(asm_rounding_dir, uart_rounding_dir, this->instrName + "-" + std::to_string(i));
+
+					int32_t sfcsr_rounding = static_cast<int32_t>(patmos_round) << 5;
+					test.setRegister("sfcsr", sfcsr_rounding);
+
+					typename uni_f::testData tData = this->setRegistersAndGetInstrData(test, rng_gen);
+
+					fp_result accum_result{0};
+					for (size_t z = 0; z < pipeline_stages; z++)
+					{
+						tData.destReg = getRandomReg(rng_gen, this->getDestRegs());
+						test.addInstr(this->instrName + " " + tData.destReg.regName + " = " + string_join(tData.instr_sources, ", "), uni_f::instr_byte_count);
+						tData.instr_sources[op_index] = tData.destReg.regName;
+
+						fp_result fp_res = get_fp_result(x86_round, tData.sourceValues);
+
+						accum_result.result = tData.destReg.isReadonly ? static_cast<FRet>(tData.destReg.readonly_value) : fp_res.result;
+						accum_result.exceptions |= fp_res.exceptions;
+						this->replace_sources_with_new_value(tData.instr_sources, tData.destReg.regName, tData.sourceValues, fp_res.result, std::make_index_sequence<uni_f::func_arg_count>());
+					}
+					
+					this->set_expected_value(test, tData.destReg, accum_result.result);
+					test.expectRegisterValue("sfcsr", accum_result.exceptions | sfcsr_rounding);
+
+					test.close();
+				}
+			}
+		}
 
 	public:
 		uni_float_format(std::string name, const std::vector<rounding::x86_round_mode>& rounding_modes, FType opFunc, TArgs...instr_bits) :
@@ -592,13 +698,13 @@ namespace patmos
 		{
 			if constexpr (useMakeTests)
 			{
+				std::string asm_dir = create_dir_if_not_exists(asmfilepath, this->instrName);
+				std::string uart_dir = create_dir_if_not_exists(expfilepath, this->instrName);
+
 				for (auto x86_round : rounding_modes)
 				{
 					rounding::patmos_round_mode patmos_round = rounding::x86_to_patmos_round(x86_round);
 					std::string patmos_round_str = rounding::patmos_round_to_string(patmos_round);
-
-					std::string asm_dir = create_dir_if_not_exists(asmfilepath, this->instrName);
-					std::string uart_dir = create_dir_if_not_exists(expfilepath, this->instrName);
 
 					std::string asm_rounding_dir = create_dir_if_not_exists(asm_dir, "rounding_" + patmos_round_str);
 					std::string uart_rounding_dir = create_dir_if_not_exists(uart_dir, "rounding_" + patmos_round_str);
@@ -613,42 +719,10 @@ namespace patmos
 						typename uni_f::testData tData = this->setRegistersAndGetInstrData(test, rngGen);
 						test.addInstr(this->instrName + " " + tData.destReg.regName + " = " + string_join(tData.instr_sources, ", "), uni_f::instr_byte_count);
 
-						std::fenv_t curr_fenv;
-						if (fegetenv(&curr_fenv) != 0)
-						{
-							throw std::runtime_error("Failed to store the current floating-point environment.");
-						}
-						if (fesetround((int32_t)x86_round) != 0)
-						{
-							throw std::runtime_error("Failed to set the floating-point rounding mode.");
-						}
-						if (feclearexcept(FE_ALL_EXCEPT) != 0)
-						{
-							throw std::runtime_error("Failed to clear floating-point exceptions.");
-						}
+						fp_result fp_res = get_fp_result(x86_round, tData.sourceValues);
 
-						FRet result = std::apply(this->opFunc, tData.sourceValues);
-
-						std::fexcept_t x86_exceptions;
-						if (fegetexceptflag(&x86_exceptions, FE_ALL_EXCEPT) != 0)
-						{
-							throw std::runtime_error("Failed to get floating-point exceptions.");
-						}
-						int32_t patmos_exceptions = exception::x86_to_patmos_exceptions(x86_exceptions);
-
-						if (fesetenv(&curr_fenv) != 0)
-						{
-							throw std::runtime_error("Failed to restore the floating-point environment.");
-						}
-
-						//nan on x86 is not the same nan as per the RISCV spec
-						if (std::isnan(result))
-						{
-							result = itf(0x7fc00000);
-						}
-
-						this->set_expected_value(test, tData.destReg, result);
-						test.expectRegisterValue("sfcsr", patmos_exceptions | sfcsr_rounding);
+						this->set_expected_value(test, tData.destReg, fp_res.result);
+						test.expectRegisterValue("sfcsr", fp_res.exceptions | sfcsr_rounding);
 
 						test.close();
 					}
